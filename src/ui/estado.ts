@@ -23,7 +23,7 @@ export function textoEstado(
   }
 }
 
-/** Plantilla de segmentos apagados con al menos `minimo` cifras: «23» con minimo 3 da «888». */
+/** Plantilla de segmentos apagados con al menos `minimo` cifras: «23» con minimo 3 da «888»; «8,8» da «88,8». */
 export function plantillaDe(texto: string, minimo: number): string {
   const forma = texto.replace(/\d/g, '8');
   const cifras = (forma.match(/8/g) ?? []).length;

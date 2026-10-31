@@ -576,12 +576,44 @@ dd {
   grid-area: 1 / 1;
   justify-self: end;
 }
+.d7-fondo,
+.d7-valor {
+  display: inline-flex;
+  align-items: flex-end;
+}
 .d7-fondo {
   color: var(--tinta);
   opacity: 0.4;
 }
 .d7-valor {
   color: var(--ambar);
+}
+/* La coma decimal, dibujada: DSEG7 no la trae. Un punto cuadrado y una cola inclinada, con el grosor
+   de un segmento, y el mismo ancho encendida o apagada. */
+.d7-coma {
+  position: relative;
+  flex: none;
+  width: 0.3em;
+  height: 1em;
+}
+.d7-coma::before,
+.d7-coma::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+}
+.d7-coma::before {
+  left: 0.08em;
+  bottom: 0.02em;
+  width: 0.1em;
+  height: 0.1em;
+}
+.d7-coma::after {
+  left: 0.05em;
+  bottom: -0.07em;
+  width: 0.06em;
+  height: 0.1em;
+  transform: skewX(-25deg);
 }
 /* El único movimiento no pedido: los indicadores del resultado se encienden uno tras otro. */
 .tira .d7-valor {

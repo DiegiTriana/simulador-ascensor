@@ -99,7 +99,7 @@ describe('validar', () => {
       const r = validar(MIERCOLES);
       expect(r.ok).toBe(true);
       expect(r.ok && r.avisos).toEqual([
-        'En los picos se esperan unas 3,7 personas por minuto y el ascensor mueve unas 3,5: muchas se irán por las escaleras.',
+        'En los picos se esperan unas 3,7 personas por minuto y el ascensor mueve, en promedio, unas 3,5: muchas se irán por las escaleras.',
       ]);
     });
     it('no sale con pocas llegadas', () => {

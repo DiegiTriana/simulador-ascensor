@@ -3,11 +3,11 @@ import { useApp } from '../store/app.ts';
 import { Display7 } from './Display7.tsx';
 import { Lamparas } from './Lamparas.tsx';
 import { plantillaDe, textoEstado } from './estado.ts';
-import { coma, punto } from './formato.ts';
+import { coma } from './formato.ts';
 import { indicadoresDe } from './tabla.ts';
 import { useValidacion } from './validacionUi.ts';
 
-const pctTexto = (n: number) => (n >= 99.95 ? '100' : punto(n, 1));
+const pctTexto = (n: number) => (n >= 99.95 ? '100' : coma(n, 1));
 
 /** El único bloque oscuro de la columna: lámparas de progreso, el indicador principal y tres pequeños. */
 export function Tira() {
@@ -59,7 +59,7 @@ export function Tira() {
               <Display7
                 tamano="grande"
                 texto={sim}
-                plantilla={plantillaDe(sim ?? '0.0', 3)}
+                plantilla={plantillaDe(sim ?? '0,0', 3)}
                 etiqueta={`Simulación: ${lectura(ind?.simulacion)}`}
                 orden={0}
               />
@@ -72,7 +72,7 @@ export function Tira() {
               <Display7
                 tamano="mediano"
                 texto={formulas}
-                plantilla={plantillaDe(formulas ?? '0.0', 3)}
+                plantilla={plantillaDe(formulas ?? '0,0', 3)}
                 etiqueta={`Fórmulas: ${lectura(ind?.formulas)}`}
                 orden={1}
               />
@@ -83,7 +83,7 @@ export function Tira() {
             <div>
               <dt>Real, miércoles</dt>
               <dd>
-                <Display7 tamano="mediano" texto={real} plantilla={plantillaDe(real ?? '0.0', 3)} etiqueta={`Real: ${lectura(ind.real)}`} orden={2} />
+                <Display7 tamano="mediano" texto={real} plantilla={plantillaDe(real ?? '0,0', 3)} etiqueta={`Real: ${lectura(ind.real)}`} orden={2} />
                 <span className="unidad-d7">%</span>
               </dd>
             </div>

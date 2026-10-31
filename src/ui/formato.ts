@@ -11,6 +11,3 @@ export function coma(n: number, decimales = 1): string {
   }
   return f.format(n);
 }
-
-/** Texto para el reloj de siete segmentos, donde el punto es un segmento: 3,7 → «3.7». */
-export const punto = (n: number, decimales = 1): string => n.toFixed(decimales);
