@@ -1,0 +1,178 @@
+// Reparte a las personas en el tiempo: picos junto a los cambios de clase y valle en el resto.
+
+import { PARAMETROS as P } from '../data/parametros.ts';
+import { cambiosEnFranja } from '../data/horario.ts';
+import { barajar, crearRng, elegirPonderado, type Rng } from './rng.ts';
+import type { Entradas, Escenario, Persona, TipoPersona } from './tipos.ts';
+
+type Ventana = [number, number];
+
+export function validarEntradas(e: Entradas): void {
+  const enteros: (keyof Entradas)[] = ['llegadasP1', 'bajan', 'sillas', 'muletas', 'usosAseo'];
+  for (const k of enteros) {
+    if (!Number.isInteger(e[k]) || e[k] < 0) throw new RangeError(`${k} debe ser un entero mayor o igual a 0`);
+  }
+  if (!Number.isFinite(e.horaInicioMin) || e.horaInicioMin < 0) throw new RangeError('horaInicioMin inválida');
+  if (!Number.isFinite(e.duracionMin) || e.duracionMin <= 0) throw new RangeError('duracionMin debe ser mayor que 0');
+  if (e.sillas + e.muletas > e.llegadasP1) {
+    throw new RangeError('Las sillas y muletas se cuentan dentro de las llegadas a P1');
+  }
+}
+
+function unir(ventanas: Ventana[]): Ventana[] {
+  const orden = [...ventanas].sort((a, b) => a[0] - b[0]);
+  const res: Ventana[] = [];
+  for (const v of orden) {
+    const ultima = res[res.length - 1];
+    if (ultima && v[0] <= ultima[1]) ultima[1] = Math.max(ultima[1], v[1]);
+    else res.push([v[0], v[1]]);
+  }
+  return res;
+}
+
+function complemento(ventanas: Ventana[], T: number): Ventana[] {
+  const res: Ventana[] = [];
+  let cursor = 0;
+  for (const [a, b] of ventanas) {
+    if (a > cursor) res.push([cursor, a]);
+    cursor = Math.max(cursor, b);
+  }
+  if (cursor < T) res.push([cursor, T]);
+  return res;
+}
+
+const largo = (vs: Ventana[]) => vs.reduce((s, [a, b]) => s + (b - a), 0);
+
+/** Segundo entero uniforme dentro de la unión de ventanas. */
+function muestrear(rng: Rng, vs: Ventana[], T: number): number {
+  let u = rng() * largo(vs);
+  for (const [a, b] of vs) {
+    if (u < b - a) return Math.min(T - 1, Math.floor(a + u));
+    u -= b - a;
+  }
+  return Math.min(T - 1, Math.floor(vs[vs.length - 1][1] - 1));
+}
+
+const dentro = (vs: Ventana[], t: number) => vs.some(([a, b]) => t >= a && t < b);
+
+export interface OpcionesEscenario {
+  /**
+   * Tamaño promedio de los grupos que llegan juntos a P1 y suben al mismo piso (una clase).
+   * 1 = cada persona llega y elige destino por separado (valor por defecto).
+   */
+  tamanoGrupo?: number;
+}
+
+export function generarEscenario(entradas: Entradas, semilla: number, opciones: OpcionesEscenario = {}): Escenario {
+  validarEntradas(entradas);
+  const rng = crearRng(semilla);
+  const T = Math.round(entradas.duracionMin * 60);
+  const cambios = cambiosEnFranja(entradas.horaInicioMin, entradas.duracionMin).map(
+    (c) => Math.round((c - entradas.horaInicioMin) * 60),
+  );
+
+  const picos = unir(cambios.map((o) => [Math.max(0, o - P.picoSegundos), Math.min(T, o + P.picoSegundos)] as Ventana));
+  const valle = complemento(picos, T);
+  const todo: Ventana[] = [[0, T]];
+
+  // Quienes ya esperaban al comenzar (solo si la franja empieza en un cambio de clase).
+  const N = entradas.llegadasP1;
+  const empiezaEnCambio = cambios.includes(0);
+  const inicial = empiezaEnCambio
+    ? Math.min(N, Math.round((N * P.esperabanAlInicio.esperaban) / P.esperabanAlInicio.de))
+    : 0;
+  const resto = N - inicial;
+
+  // 88 % de las demás en los picos, el resto en el valle.
+  let enPicos: number;
+  if (largo(picos) === 0) enPicos = 0;
+  else if (largo(valle) === 0) enPicos = resto;
+  else enPicos = Math.round(resto * P.fraccionEnPicos);
+  const tiempos: number[] = [];
+  for (let i = 0; i < enPicos; i++) tiempos.push(muestrear(rng, picos, T));
+  const ventanasValle = largo(valle) > 0 ? valle : todo;
+  for (let i = enPicos; i < resto; i++) tiempos.push(muestrear(rng, ventanasValle, T));
+  tiempos.sort((a, b) => a - b);
+
+  // Sillas y muletas ocupan al azar algunas de esas llegadas (o de las iniciales si no alcanzan).
+  const tipos: TipoPersona[] = [
+    ...Array<TipoPersona>(entradas.sillas).fill('silla'),
+    ...Array<TipoPersona>(entradas.muletas).fill('muletas'),
+  ];
+  const posiciones = barajar(rng, Array.from({ length: N }, (_, i) => i)); // 0..inicial-1 son las iniciales
+  const tipoDe = new Map<number, TipoPersona>();
+  const candidatas = [...posiciones.filter((i) => i >= inicial), ...posiciones.filter((i) => i < inicial)];
+  tipos.forEach((t, i) => tipoDe.set(candidatas[i], t));
+
+  // Grupos: personas consecutivas que llegan juntas y comparten destino (una clase que sube).
+  const grupo = Math.max(1, Math.round(opciones.tamanoGrupo ?? 1));
+  const primeroDelGrupo: number[] = [];
+  let inicioGrupo = 0;
+  let faltanDelGrupo = 0;
+  for (let i = 0; i < N; i++) {
+    if (faltanDelGrupo === 0 || i === inicial) {
+      inicioGrupo = i;
+      faltanDelGrupo = grupo > 1 ? 1 + Math.floor(rng() * (2 * grupo - 1)) : 1; // de 1 a 2·grupo−1, promedio = grupo
+    }
+    faltanDelGrupo--;
+    primeroDelGrupo.push(inicioGrupo);
+  }
+  const destinoDelGrupo = new Map<number, number>();
+
+  const personas: Omit<Persona, 'id'>[] = [];
+  for (let i = 0; i < N; i++) {
+    const esInicial = i < inicial;
+    const lider = primeroDelGrupo[i];
+    const llegada = esInicial ? 0 : tiempos[lider - inicial];
+    const tipo = tipoDe.get(i) ?? 'normal';
+    if (i === lider) destinoDelGrupo.set(lider, elegirPonderado(rng, P.destinosSubida).piso);
+    personas.push({
+      tipo,
+      cupos: tipo === 'silla' ? P.cuposSilla : tipo === 'muletas' ? P.cuposMuletas : 1,
+      origen: 1,
+      destino: destinoDelGrupo.get(lider) as number,
+      llegada,
+      inicial: esInicial,
+      enPico: esInicial || dentro(picos, llegada),
+      abordo: null,
+      bajo: null,
+      seFue: false,
+    });
+  }
+
+  // Quienes bajan tras un cambio de clase (los que ocurren dentro de la franja, sin contar el final).
+  const cambiosQueSueltan = cambios.filter((o) => o < T);
+  for (let i = 0; i < entradas.bajan; i++) {
+    let llegada: number;
+    if (cambiosQueSueltan.length > 0) {
+      const o = cambiosQueSueltan[i % cambiosQueSueltan.length];
+      llegada = Math.min(T - 1, o + Math.floor(rng() * P.picoSegundos));
+    } else {
+      llegada = Math.floor(rng() * T); // sin cambio de clase en la franja: se reparten parejo
+    }
+    personas.push({
+      tipo: 'normal',
+      cupos: 1,
+      origen: elegirPonderado(rng, P.origenesBajada).piso,
+      destino: elegirPonderado(rng, P.destinosBajada).piso,
+      llegada,
+      inicial: false,
+      enPico: false,
+      abordo: null,
+      bajo: null,
+      seFue: false,
+    });
+  }
+
+  personas.sort((a, b) => a.llegada - b.llegada);
+  const solicitudesAseo = Array.from({ length: entradas.usosAseo }, (_, i) =>
+    Math.floor(((i + 0.5) / entradas.usosAseo) * T),
+  );
+
+  return {
+    duracionS: T,
+    personas: personas.map((p, id) => ({ ...p, id })),
+    solicitudesAseo,
+    ventanasPico: picos,
+  };
+}
