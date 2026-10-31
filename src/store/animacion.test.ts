@@ -134,12 +134,42 @@ describe('pausar congela todo', () => {
     expect(estado().corrida!.reloj.t).toBe(traza.finS);
   });
 
-  it('volver al inicio lleva el reloj a 0 y reproduce', () => {
+  it('Reiniciar vuelve al segundo 0 de la misma corrida y la deja en pausa', () => {
     estado().cargar(traza, CASO_MIERCOLES);
+    const corrida = estado().corrida!;
     estado().saltarA(900);
-    estado().pausar();
+    expect(estado().enMarcha).toBe(true);
+    estado().reiniciar();
+    expect(estado().corrida).toBe(corrida); // la misma corrida: no se simula de nuevo
+    expect(corrida.reloj.t).toBe(0);
+    expect(estado().enMarcha).toBe(false);
+    expect(estado().terminada).toBe(false);
+    for (let i = 0; i < 100; i++) expect(estado().avanzar(1 / 60)).toBe(false);
+    expect(corrida.reloj.t).toBe(0);
+    estado().reproducir();
+    expect(estado().enMarcha).toBe(true);
+  });
+
+  it('Reiniciar después de terminar también deja la corrida al principio y en pausa; «Ver de nuevo» sí reproduce', () => {
+    estado().cargar(traza, CASO_MIERCOLES);
+    estado().saltarA(traza.finS);
+    expect(estado().terminada).toBe(true);
     estado().reiniciar();
     expect(estado().corrida!.reloj.t).toBe(0);
+    expect(estado().terminada).toBe(false);
+    expect(estado().enMarcha).toBe(false);
+    estado().saltarA(traza.finS);
+    estado().alternar();
+    expect(estado().corrida!.reloj.t).toBe(0);
     expect(estado().enMarcha).toBe(true);
+  });
+
+  it('Reiniciar avisa a la escena para que recoloque todo', () => {
+    estado().cargar(traza, CASO_MIERCOLES);
+    estado().pausar();
+    estado().saltarA(500);
+    const antes = estado().saltos;
+    estado().reiniciar();
+    expect(estado().saltos).toBeGreaterThan(antes);
   });
 });

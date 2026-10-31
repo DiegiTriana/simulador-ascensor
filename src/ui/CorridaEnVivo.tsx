@@ -4,6 +4,7 @@ import { indicadoresEn, formatoReloj, type Indicadores } from '../scene/corrida.
 import { etiquetaPiso } from '../scene/medidas.ts';
 import { CAPACIDAD_CABINA } from '../data/modelos.ts';
 import { VELOCIDADES, useAnimacion, type Corrida } from '../store/animacion.ts';
+import { FRASE_FIN_DE_FRANJA, fraccionDeFranja, minutosYSegundos, pasoLaFranja } from './reproductor.ts';
 
 /** Segundo simulado de la corrida. Mientras corre se lee unas 7 veces por segundo; en pausa, solo cuando cambia. */
 export function useSegundo(corrida: Corrida | null): number {
@@ -18,8 +19,6 @@ export function useSegundo(corrida: Corrida | null): number {
   }, [corrida, enMarcha, saltos]);
   return t;
 }
-
-const minutosYSegundos = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 function FlechaDePiso({ sentido }: { sentido: Indicadores['sentido'] }) {
   if (sentido === 0) return null;
@@ -99,7 +98,18 @@ function Icono({ tipo }: { tipo: 'play' | 'pausa' | 'repetir' | 'inicio' }) {
   );
 }
 
-/** Pausa y reanuda, volver al inicio, velocidad y una barra para ir a cualquier momento de la corrida. */
+/** Cuando el reloj pasa el fin de la franja, una frase corta sobre la escena. */
+export function AvisoFinDeFranja({ corrida }: { corrida: Corrida }) {
+  const t = useSegundo(corrida);
+  if (!pasoLaFranja(t, corrida.entradas.duracionMin * 60, corrida.indice.fin)) return null;
+  return (
+    <p className="escena-franja" role="status">
+      {FRASE_FIN_DE_FRANJA}
+    </p>
+  );
+}
+
+/** Pausa y reanuda, reiniciar, velocidad y una barra para ir a cualquier momento de la corrida. */
 export function Reproductor({ corrida }: { corrida: Corrida }) {
   const enMarcha = useAnimacion((s) => s.enMarcha);
   const terminada = useAnimacion((s) => s.terminada);
@@ -110,6 +120,9 @@ export function Reproductor({ corrida }: { corrida: Corrida }) {
   const saltarA = useAnimacion((s) => s.saltarA);
   const t = useSegundo(corrida);
   const fin = Math.floor(corrida.indice.fin);
+  const franjaS = corrida.entradas.duracionMin * 60;
+  const marca = fraccionDeFranja(franjaS, corrida.indice.fin);
+  const despuesDeLaFranja = pasoLaFranja(t, franjaS, corrida.indice.fin);
 
   const nombre = terminada ? 'Ver de nuevo' : enMarcha ? 'Pausar' : 'Reanudar';
   return (
@@ -120,8 +133,17 @@ export function Reproductor({ corrida }: { corrida: Corrida }) {
           {nombre}
         </span>
       </button>
-      <button type="button" className="reproductor-boton reproductor-inicio" onClick={reiniciar} aria-label="Volver al inicio">
+      <button
+        type="button"
+        className="reproductor-boton"
+        onClick={reiniciar}
+        aria-label="Reiniciar la animación"
+        title="Reiniciar la animación: vuelve al segundo 0 de esta corrida y queda en pausa"
+      >
         <Icono tipo="inicio" />
+        <span className="reproductor-texto" aria-hidden="true">
+          Reiniciar
+        </span>
       </button>
       <label className="reproductor-velocidad">
         <span className="reproductor-etiqueta">Velocidad</span>
@@ -133,7 +155,7 @@ export function Reproductor({ corrida }: { corrida: Corrida }) {
           ))}
         </select>
       </label>
-      <label className="reproductor-barra">
+      <label className="reproductor-barra" style={marca === null ? undefined : ({ '--marca': marca } as React.CSSProperties)}>
         <span className="sr-only">Momento de la corrida</span>
         <input
           type="range"
@@ -141,9 +163,20 @@ export function Reproductor({ corrida }: { corrida: Corrida }) {
           max={fin}
           step={1}
           value={Math.min(fin, Math.floor(t))}
-          aria-valuetext={`minuto ${minutosYSegundos(t)} de ${minutosYSegundos(fin)}, son las ${formatoReloj(corrida.entradas.horaInicioMin, t)}`}
+          aria-describedby={marca === null ? undefined : 'franja-fin'}
+          aria-valuetext={`minuto ${minutosYSegundos(t)} de ${minutosYSegundos(fin)}, son las ${formatoReloj(corrida.entradas.horaInicioMin, t)}${despuesDeLaFranja ? ', ya terminó la franja' : ''}`}
           onChange={(e) => saltarA(Number(e.target.value))}
         />
+        {marca !== null && (
+          <>
+            <span className="reproductor-marca" aria-hidden="true" title="Aquí termina la franja">
+              <span className="reproductor-marca-texto">{minutosYSegundos(franjaS)}</span>
+            </span>
+            <span id="franja-fin" className="sr-only">
+              La franja termina en el minuto {minutosYSegundos(franjaS)}.
+            </span>
+          </>
+        )}
       </label>
       <span className="reproductor-tiempo" aria-hidden="true">
         {minutosYSegundos(t)} <span className="reproductor-total">de {minutosYSegundos(fin)}</span>

@@ -39,11 +39,12 @@ interface Estado {
 
   cargar(traza: Traza, entradas: Entradas, opciones?: { enMarcha?: boolean }): void;
   descartar(): void;
+  /** Si la corrida terminó, la vuelve a empezar y la reproduce («Ver de nuevo»). */
   reproducir(): void;
   pausar(): void;
   alternar(): void;
   fijarVelocidad(velocidad: number): void;
-  /** Vuelve al segundo 0 y reproduce. */
+  /** Vuelve al segundo 0 de la misma corrida y la deja en pausa. No simula de nuevo ni toca los resultados. */
   reiniciar(): void;
   saltarA(t: number): void;
   /** Avanza el reloj `dtReal` segundos reales (si está en marcha). Devuelve true si el reloj cambió. */
@@ -72,8 +73,10 @@ export const useAnimacion = create<Estado>()((set, get) => ({
   reproducir() {
     const { corrida, terminada } = get();
     if (!corrida) return;
-    if (terminada) get().reiniciar();
-    else set({ enMarcha: true });
+    if (terminada) {
+      corrida.reloj.t = 0;
+      set((s) => ({ enMarcha: true, terminada: false, saltos: s.saltos + 1 }));
+    } else set({ enMarcha: true });
   },
 
   pausar() {
@@ -93,7 +96,7 @@ export const useAnimacion = create<Estado>()((set, get) => ({
     const { corrida } = get();
     if (!corrida) return;
     corrida.reloj.t = 0;
-    set((s) => ({ enMarcha: true, terminada: false, saltos: s.saltos + 1 }));
+    set((s) => ({ enMarcha: false, terminada: false, saltos: s.saltos + 1 }));
   },
 
   saltarA(t) {

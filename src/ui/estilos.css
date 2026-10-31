@@ -396,7 +396,7 @@ sub {
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 8px 10px 16px;
   background: var(--tarjeta);
   border-top: 1px solid var(--linea);
 }
@@ -417,8 +417,7 @@ sub {
 }
 .reproductor-texto,
 .reproductor-etiqueta,
-.reproductor-total,
-.reproductor-inicio {
+.reproductor-total {
   display: none;
 }
 .reproductor-velocidad select {
@@ -433,6 +432,7 @@ sub {
   flex: none;
 }
 .reproductor-barra {
+  position: relative;
   display: flex;
   flex: 1 1 80px;
   align-items: center;
@@ -440,11 +440,72 @@ sub {
   min-height: 44px;
 }
 .reproductor-barra input {
+  position: relative;
+  z-index: 1;
   width: 100%;
   min-width: 0;
   height: 28px;
   margin: 0;
-  accent-color: var(--acento);
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.reproductor-barra input::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--pista);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+}
+.reproductor-barra input::-moz-range-track {
+  height: 6px;
+  background: var(--pista);
+  border: 1px solid var(--control);
+  border-radius: 4px;
+}
+.reproductor-barra input::-webkit-slider-thumb {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  margin-top: -8px;
+  background: var(--acento);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--acento-os);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.reproductor-barra input::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  background: var(--acento);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--acento-os);
+}
+/* Dónde termina la franja: una raya sobre la barra y su minuto debajo. Los 20 px son el ancho del botón de la barra. */
+.reproductor-marca {
+  position: absolute;
+  top: 50%;
+  left: calc(10px + var(--marca, 0) * (100% - 20px));
+  width: 2px;
+  height: 20px;
+  background: var(--tinta);
+  border-radius: 1px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.reproductor-marca-texto {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 3px;
+  color: var(--tinta-2);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateX(-50%);
 }
 .reproductor-tiempo {
   flex: none;
@@ -453,6 +514,41 @@ sub {
   font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* La frase de fin de franja y el botón «Ver resultados» van sobre la escena, sin mover nada de lugar. */
+.escena-franja {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--tarjeta);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  color: var(--tinta);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+.ver-resultados {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: var(--tarjeta);
+  border: 1px solid var(--control);
+  border-radius: var(--rs);
+  color: var(--tinta);
+  font-weight: 700;
 }
 
 @media (min-width: 640px) {
@@ -469,12 +565,8 @@ sub {
   .vivo-nota-resto,
   .reproductor-texto,
   .reproductor-etiqueta,
-  .reproductor-total,
-  .reproductor-inicio {
+  .reproductor-total {
     display: inline;
-  }
-  .reproductor-inicio {
-    display: inline-flex;
   }
   .reproductor-velocidad {
     display: flex;
@@ -485,6 +577,9 @@ sub {
 }
 
 @media (min-width: 900px) {
+  .ver-resultados {
+    display: none;
+  }
   .cuerpo {
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--ancho-panel);

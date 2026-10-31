@@ -3,9 +3,8 @@ import { useApp } from '../store/app.ts';
 import { Ayuda } from './Ayuda.tsx';
 import { Botonera } from './Botonera.tsx';
 import { Escena } from './Escena.tsx';
+import { alTerminarDeSimular } from './foco.ts';
 import { Resultados } from './Resultados.tsx';
-
-const sinMovimiento = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function App() {
   const ayuda = useApp((s) => s.ayuda);
@@ -13,12 +12,11 @@ export function App() {
   const cerrarAyuda = useApp((s) => s.cerrarAyuda);
   const idResultado = useApp((s) => s.resultado?.id);
 
-  // Al llegar un resultado nuevo, el foco va al título de resultados y la página se desplaza hasta ahí.
+  // Al llegar un resultado nuevo: en escritorio, al título de los resultados; en celular, a la escena (ahí empieza
+  // la animación) y desde ahí el botón «Ver resultados» baja a ellos.
   useEffect(() => {
     if (idResultado === undefined) return;
-    const titulo = document.getElementById('titulo-resultados');
-    titulo?.focus({ preventScroll: true });
-    titulo?.scrollIntoView({ behavior: sinMovimiento() ? 'auto' : 'smooth', block: 'start' });
+    alTerminarDeSimular();
   }, [idResultado]);
 
   return (

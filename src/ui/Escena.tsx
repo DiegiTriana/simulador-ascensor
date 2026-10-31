@@ -4,7 +4,9 @@ import { LimiteDeErrores, webglDisponible } from '../scene/Limite.tsx';
 import { PISO_MAXIMO } from '../scene/medidas.ts';
 import { useAnimacion } from '../store/animacion.ts';
 import { useEscena } from '../store/escena.ts';
-import { IndicadoresEnVivo, Reproductor } from './CorridaEnVivo.tsx';
+import { useApp } from '../store/app.ts';
+import { AvisoFinDeFranja, IndicadoresEnVivo, Reproductor } from './CorridaEnVivo.tsx';
+import { irAResultados } from './foco.ts';
 
 const Escena3D = lazy(() => import('../scene/Escena3D.tsx'));
 
@@ -14,6 +16,7 @@ export function Escena() {
   const vista = useEscena((s) => s.vista);
   const piso = useEscena((s) => s.piso);
   const corrida = useAnimacion((s) => s.corrida);
+  const hayResultado = useApp((s) => s.resultado !== null);
   const [sinContexto, setSinContexto] = useState(false);
   const mostrar3D = webglDisponible() && !sinContexto;
   const descripcion =
@@ -33,6 +36,15 @@ export function Escena() {
           </LimiteDeErrores>
         ) : (
           <AvisoSinEscena />
+        )}
+        {mostrar3D && corrida && <AvisoFinDeFranja corrida={corrida} />}
+        {mostrar3D && hayResultado && (
+          <button type="button" id="ver-resultados" className="ver-resultados" onClick={irAResultados}>
+            Ver resultados
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d="M12 19 L4.5 8 H19.5 Z" fill="currentColor" />
+            </svg>
+          </button>
         )}
         {mostrar3D && !corrida && <span className="escena-etiqueta">Escena de muestra. Pulsa Simular para ver una corrida.</span>}
       </div>
