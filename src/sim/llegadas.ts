@@ -108,22 +108,33 @@ export interface OpcionesEscenario {
   tamanoGrupo?: number;
 }
 
-export function generarEscenario(entradas: Entradas, semilla: number, opciones: OpcionesEscenario = {}): Escenario {
-  validarEntradas(entradas);
-  const rng = crearRng(semilla);
+interface Reparto {
+  T: number;
+  cambios: number[];
+  picos: Ventana[];
+  valle: Ventana[];
+  /** Quienes ya esperaban al comenzar (solo si la franja empieza en un cambio de clase). */
+  inicial: number;
+  /** Llegadas que caen dentro de los picos (sin las iniciales). */
+  enPicos: number;
+  /** Llegadas que no son iniciales. */
+  resto: number;
+}
+
+/**
+ * Cómo se reparten las llegadas entre picos y valle. Sin ningún cambio de clase en la franja no hay
+ * picos: todas las llegadas son de valle y se reparten parejo en toda la franja.
+ */
+function repartoBase(entradas: Entradas): Reparto {
   const T = Math.round(entradas.duracionMin * 60);
   const cambios = cambiosEnFranja(entradas.horaInicioMin, entradas.duracionMin).map(
     (c) => Math.round((c - entradas.horaInicioMin) * 60),
   );
-
   const picos = unir(cambios.map((o) => [Math.max(0, o - P.picoSegundos), Math.min(T, o + P.picoSegundos)] as Ventana));
   const valle = complemento(picos, T);
-  const todo: Ventana[] = [[0, T]];
 
-  // Quienes ya esperaban al comenzar (solo si la franja empieza en un cambio de clase).
   const N = entradas.llegadasP1;
-  const empiezaEnCambio = cambios.includes(0);
-  const inicial = empiezaEnCambio
+  const inicial = cambios.includes(0)
     ? Math.min(N, Math.round((N * P.esperabanAlInicio.esperaban) / P.esperabanAlInicio.de))
     : 0;
   const resto = N - inicial;
@@ -133,6 +144,25 @@ export function generarEscenario(entradas: Entradas, semilla: number, opciones: 
   if (largo(picos) === 0) enPicos = 0;
   else if (largo(valle) === 0) enPicos = resto;
   else enPicos = Math.round(resto * P.fraccionEnPicos);
+  return { T, cambios, picos, valle, inicial, enPicos, resto };
+}
+
+/**
+ * Personas por minuto que se esperan dentro de los picos (promedio de todas las ventanas de pico),
+ * o null si la franja no tiene picos. No usa el generador: es la cuenta del reparto.
+ */
+export function tasaEsperadaPicos(entradas: Entradas): number | null {
+  const { picos, enPicos } = repartoBase(entradas);
+  const segundos = largo(picos);
+  return segundos > 0 ? enPicos / (segundos / 60) : null;
+}
+
+export function generarEscenario(entradas: Entradas, semilla: number, opciones: OpcionesEscenario = {}): Escenario {
+  validarEntradas(entradas);
+  const rng = crearRng(semilla);
+  const { T, cambios, picos, valle, inicial, enPicos, resto } = repartoBase(entradas);
+  const todo: Ventana[] = [[0, T]];
+  const N = entradas.llegadasP1;
   const tiempos: number[] = [];
   const segmentos = segmentosDePico(cambios, T);
   const porSegmento = repartir(enPicos, segmentos.map((s) => s.peso));
