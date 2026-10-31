@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "tabla": "node scripts/tabla-miercoles.ts"
+    "tabla": "node scripts/tabla-miercoles.ts",
+    "modelos": "node scripts/preparar-modelos.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.9",

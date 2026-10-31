@@ -113,6 +113,7 @@ export function Ayuda({ abierta, alCerrar }: Props) {
           <ul>
             <li>Letra de los textos: Atkinson Hyperlegible, del Braille Institute of America (licencia SIL Open Font License 1.1).</li>
             <li>Dígitos de siete segmentos: DSEG7 Classic, de keshikan (licencia SIL Open Font License 1.1).</li>
+            <li>Personajes, silla de ruedas y muleta de la escena 3D: «Mini Characters», de Kenney (www.kenney.nl), licencia Creative Commons Zero (CC0). Se recortaron los clips que no se usan, se ajustó el tamaño y se comprimieron.</li>
             <li>Datos: «Datos del ascensor y plan de simulación» (documento de la profesora) y los datos recolectados en el edificio.</li>
             <li>Hecho con React, Zustand y Vite. Todo corre en tu navegador: la página no pide nada a otros sitios.</li>
           </ul>
