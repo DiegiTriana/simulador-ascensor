@@ -543,6 +543,15 @@ dd {
   font-size: 0.9rem;
   color: var(--claro);
 }
+.chicos > div {
+  display: contents;
+}
+.chicos dt {
+  align-self: end;
+}
+.chicos dd {
+  align-self: start;
+}
 .principal dd,
 .chicos dd {
   display: flex;
@@ -554,10 +563,13 @@ dd {
   font-size: 1rem;
   color: var(--acero);
 }
+/* Dos filas: los nombres arriba (alineados al fondo, pueden ocupar dos líneas) y las cifras abajo, todas a la misma altura. */
 .chicos {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-rows: auto auto;
+  grid-auto-flow: column;
+  column-gap: 12px;
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--tinta);
