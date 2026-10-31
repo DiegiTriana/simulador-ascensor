@@ -105,7 +105,7 @@ export function avisosDe(entradas: Entradas): string[] {
   const tasa = tasaEsperadaPicos(entradas);
   if (tasa !== null && tasa > MU_AVISO_POR_MIN) {
     avisos.push(
-      `En los picos se esperan unas ${coma(tasa)} personas por minuto y el ascensor mueve, en promedio, unas ${coma(MU_AVISO_POR_MIN)}: muchas se irán por las escaleras.`,
+      `En los picos se esperan unas ${coma(tasa)} personas por minuto y el ascensor sube, en promedio, unas ${coma(MU_AVISO_POR_MIN)}: muchas se irán por las escaleras.`,
     );
   }
   return avisos;

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { plantillaDe, textoEstado } from './estado.ts';
+import { textoCorrida, textoEstado } from './estado.ts';
 
 describe('texto de estado', () => {
-  it('dice cuántas corridas van, y que está lista o cancelada', () => {
-    expect(textoEstado('simulando', { hechas: 3, total: 10 }, null, false)).toBe('Simulando, 3 de 10');
+  it('dice qué corrida va, y que está lista o cancelada', () => {
+    expect(textoEstado('simulando', { hechas: 3, total: 10 }, null, false)).toBe('Corrida 4 de 10');
     expect(textoEstado('listo', null, null, false)).toBe('Simulación lista');
     expect(textoEstado('cancelado', null, null, false)).toBe('Simulación cancelada');
   });
@@ -11,7 +11,7 @@ describe('texto de estado', () => {
   it('«Revisa los campos marcados» tiene prioridad salvo mientras corre la simulación', () => {
     expect(textoEstado('inactivo', null, null, true)).toBe('Revisa los campos marcados.');
     expect(textoEstado('listo', null, null, true)).toBe('Revisa los campos marcados.');
-    expect(textoEstado('simulando', { hechas: 1, total: 10 }, null, true)).toBe('Simulando, 1 de 10');
+    expect(textoEstado('simulando', { hechas: 1, total: 10 }, null, true)).toBe('Corrida 2 de 10');
   });
 
   it('un error del worker dice qué pasó y qué hacer', () => {
@@ -20,10 +20,11 @@ describe('texto de estado', () => {
   });
 });
 
-describe('plantilla de segmentos', () => {
-  it('rellena con 8 hasta el mínimo de cifras', () => {
-    expect(plantillaDe('64', 3)).toBe('888');
-    expect(plantillaDe('20.7', 3)).toBe('88.8');
-    expect(plantillaDe('165', 3)).toBe('888');
+describe('corrida en curso', () => {
+  it('es la siguiente a las hechas y nunca pasa del total', () => {
+    expect(textoCorrida({ hechas: 0, total: 10 })).toBe('Corrida 1 de 10');
+    expect(textoCorrida({ hechas: 9, total: 10 })).toBe('Corrida 10 de 10');
+    expect(textoCorrida({ hechas: 10, total: 10 })).toBe('Corrida 10 de 10');
+    expect(textoCorrida(null)).toBe('Corrida 1 de 10');
   });
 });

@@ -20,6 +20,9 @@ export type Fase = 'inactivo' | 'simulando' | 'listo' | 'cancelado' | 'error';
 /** Lo que se elige en la lista de la hora: '' (nada), los minutos como texto, u 'otra'. */
 export type SeleccionHora = '' | 'otra' | `${number}`;
 
+/** Qué parte de la Ayuda abre cada «?»: 'general' abre la hoja desde el principio. */
+export type SeccionAyuda = 'general' | 'cuando' | 'gente' | 'especiales' | 'simular' | 'resultados';
+
 export interface Resultado {
   id: number;
   /** Las entradas con las que se simuló. */
@@ -39,6 +42,8 @@ interface Estado {
   /** Las entradas cambiaron después de simular. */
   obsoleto: boolean;
   mensajeError: string | null;
+  /** La hoja de Ayuda: null si está cerrada; si no, la sección a la que hay que llevar al lector. */
+  ayuda: SeccionAyuda | null;
 
   poner(campo: Campo, valor: string): void;
   ponerHora(seleccion: SeleccionHora): void;
@@ -47,6 +52,8 @@ interface Estado {
   simular(): Campo | null;
   cancelar(): void;
   otraMuestra(): Campo | null;
+  abrirAyuda(seccion: SeccionAyuda): void;
+  cerrarAyuda(): void;
 }
 
 const TEXTO_VACIO: EntradasTexto = {
@@ -110,6 +117,7 @@ export const useApp = create<Estado>()((set, get) => {
     resultado: null,
     obsoleto: false,
     mensajeError: null,
+    ayuda: null,
 
     poner(campo, valor) {
       set({ texto: { ...get().texto, [campo]: valor } });
@@ -171,6 +179,14 @@ export const useApp = create<Estado>()((set, get) => {
     otraMuestra() {
       set({ semilla: otraSemilla(get().semilla) });
       return get().simular();
+    },
+
+    abrirAyuda(seccion) {
+      set({ ayuda: seccion });
+    },
+
+    cerrarAyuda() {
+      set({ ayuda: null });
     },
   };
 });

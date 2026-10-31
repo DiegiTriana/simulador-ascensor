@@ -29,6 +29,14 @@ beforeEach(() => {
 const generacionEnviada = () => (worker.enviados.find((m) => m.tipo === 'simular') as Extract<Peticion, { tipo: 'simular' }>).generacion;
 
 describe('estado de la aplicación', () => {
+  it('cada «?» abre la Ayuda en su sección y se puede cerrar', () => {
+    expect(useApp.getState().ayuda).toBeNull();
+    useApp.getState().abrirAyuda('especiales');
+    expect(useApp.getState().ayuda).toBe('especiales');
+    useApp.getState().cerrarAyuda();
+    expect(useApp.getState().ayuda).toBeNull();
+  });
+
   it('no simula con la botonera vacía y devuelve el primer campo con error', () => {
     expect(useApp.getState().simular()).toBe('horaInicio');
     expect(useApp.getState().fase).toBe('inactivo');

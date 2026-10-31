@@ -1,5 +1,11 @@
 import type { Fase } from '../store/app.ts';
 
+/** «Corrida 3 de 10»: la que está corriendo (las hechas más una, sin pasar del total). */
+export function textoCorrida(progreso: { hechas: number; total: number } | null): string {
+  const total = progreso?.total ?? 10;
+  return `Corrida ${Math.min((progreso?.hechas ?? 0) + 1, total)} de ${total}`;
+}
+
 /** El texto de estado de la simulación. El nombre de cada paso se conserva en todo el flujo. */
 export function textoEstado(
   fase: Fase,
@@ -11,7 +17,7 @@ export function textoEstado(
   if (hayCamposPorCorregir && fase !== 'simulando') return 'Revisa los campos marcados.';
   switch (fase) {
     case 'simulando':
-      return `Simulando, ${progreso?.hechas ?? 0} de ${progreso?.total ?? 10}`;
+      return textoCorrida(progreso);
     case 'listo':
       return 'Simulación lista';
     case 'cancelado':
@@ -23,9 +29,3 @@ export function textoEstado(
   }
 }
 
-/** Plantilla de segmentos apagados con al menos `minimo` cifras: «23» con minimo 3 da «888»; «8,8» da «88,8». */
-export function plantillaDe(texto: string, minimo: number): string {
-  const forma = texto.replace(/\d/g, '8');
-  const cifras = (forma.match(/8/g) ?? []).length;
-  return '8'.repeat(Math.max(0, minimo - cifras)) + forma;
-}

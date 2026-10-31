@@ -1,17 +1,29 @@
 import { useEffect, useRef } from 'react';
 import { RANGOS } from '../data/rangos.ts';
+import type { SeccionAyuda } from '../store/app.ts';
 import { ConSubindice } from './Subindice.tsx';
 import { filasVacias } from './tabla.ts';
 
 interface Props {
-  abierta: boolean;
+  /** null: cerrada. Si no, la sección a la que se lleva al lector ('general' es el principio). */
+  seccion: SeccionAyuda | null;
   alCerrar(): void;
 }
 
 const filas = filasVacias();
 
-export function Ayuda({ abierta, alCerrar }: Props) {
+/** El título de cada parte de la Ayuda a la que lleva un «?». */
+const ID_SECCION: Record<Exclude<SeccionAyuda, 'general'>, string> = {
+  cuando: 'ayuda-cuando',
+  gente: 'ayuda-gente',
+  especiales: 'ayuda-especiales',
+  simular: 'ayuda-simular',
+  resultados: 'ayuda-resultados',
+};
+
+export function Ayuda({ seccion, alCerrar }: Props) {
   const dialogo = useRef<HTMLDialogElement>(null);
+  const abierta = seccion !== null;
 
   useEffect(() => {
     const d = dialogo.current;
@@ -19,6 +31,14 @@ export function Ayuda({ abierta, alCerrar }: Props) {
     if (abierta && !d.open) d.showModal();
     if (!abierta && d.open) d.close();
   }, [abierta]);
+
+  // Cada «?» lleva a su parte: el foco se pone en ese título para seguir leyendo desde ahí.
+  useEffect(() => {
+    if (!seccion || seccion === 'general') return;
+    const titulo = document.getElementById(ID_SECCION[seccion]);
+    titulo?.focus({ preventScroll: true });
+    titulo?.scrollIntoView({ block: 'start' });
+  }, [seccion]);
 
   return (
     <dialog
@@ -34,13 +54,17 @@ export function Ayuda({ abierta, alCerrar }: Props) {
       <div className="ayuda-contenido">
         <div className="ayuda-cabecera">
           <h2 id="titulo-ayuda">Ayuda</h2>
-          <button type="button" className="plano" onClick={alCerrar}>
+          <button type="button" className="boton" onClick={alCerrar}>
             Cerrar
           </button>
         </div>
 
         <section>
           <h3>Qué es cada dato</h3>
+
+          <h4 id="ayuda-cuando" tabIndex={-1}>
+            1. ¿Cuándo?
+          </h4>
           <dl>
             <dt>Hora de inicio</dt>
             <dd>
@@ -50,19 +74,35 @@ export function Ayuda({ abierta, alCerrar }: Props) {
             <dd>
               Los minutos que dura el tramo, de {RANGOS.duracionMin.min} a {RANGOS.duracionMin.max}. La hora de inicio más la duración no puede pasar de las 22:05.
             </dd>
-            <dt>Personas que llegan a P1 para subir</dt>
+          </dl>
+
+          <h4 id="ayuda-gente" tabIndex={-1}>
+            2. ¿Cuánta gente?
+          </h4>
+          <dl>
+            <dt>Llegan a P1 para subir</dt>
             <dd>De {RANGOS.llegadasP1.min} a {RANGOS.llegadasP1.max}. Cuentan también las personas en silla de ruedas y con muletas.</dd>
-            <dt>Personas que bajan</dt>
+            <dt>Bajan</dt>
             <dd>De {RANGOS.bajan.min} a {RANGOS.bajan.max}. Salen de clase en los pisos altos y bajan a P1, P2 o P3.</dd>
-            <dt>Personas en silla de ruedas</dt>
+          </dl>
+
+          <h4 id="ayuda-especiales" tabIndex={-1}>
+            3. Casos especiales
+          </h4>
+          <dl>
+            <dt>Sillas de ruedas</dt>
             <dd>De {RANGOS.sillas.min} a {RANGOS.sillas.max}. Cada una ocupa 3 cupos de la cabina, sube primero y no se va por las escaleras.</dd>
-            <dt>Personas con muletas</dt>
+            <dt>Muletas</dt>
             <dd>De {RANGOS.muletas.min} a {RANGOS.muletas.max}. Cada una ocupa 2 cupos, sube primero y no se va por las escaleras.</dd>
-            <dt>Veces que el aseo usa el ascensor</dt>
+            <dt>Usos del aseo</dt>
             <dd>De {RANGOS.usosAseo.min} a {RANGOS.usosAseo.max}. Cada vez, el ascensor queda ocupado 150 segundos.</dd>
           </dl>
+
+          <h4 id="ayuda-simular" tabIndex={-1}>
+            4. Simular
+          </h4>
           <p>
-            No se pueden cambiar: la cabina es de 10 personas, el sistema admite 11 (K = 11: 10 en la cabina y 1 esperando), el ascensor tarda 5 segundos por piso y 85 de cada 100 personas que no caben se van por las escaleras.
+            Se simula 10 veces la misma franja y se promedian los resultados. No se pueden cambiar: la cabina es de 10 personas, el sistema admite 11 (K = 11: 10 en la cabina y 1 esperando), el ascensor tarda 5 segundos por piso y 85 de cada 100 personas que no caben se van por las escaleras.
           </p>
           <p>
             «Avanzado» guarda la semilla de la muestra aleatoria. Con los mismos datos y la misma semilla el resultado es siempre el mismo; «Otra muestra aleatoria» cambia la semilla y simula de nuevo.
@@ -70,7 +110,12 @@ export function Ayuda({ abierta, alCerrar }: Props) {
         </section>
 
         <section>
-          <h3>Qué es cada fila de la tabla</h3>
+          <h3 id="ayuda-resultados" tabIndex={-1}>
+            Cómo leer los resultados
+          </h3>
+          <p>
+            La frase de arriba cuenta cuántas de cada 100 personas se van por las escaleras. Las tres barras comparan lo que pasó el miércoles (solo con el caso del miércoles), lo que da la simulación y lo que dan las fórmulas de clase. «Detalle para la clase» trae la tabla con todas las medidas; cada fila es esta:
+          </p>
           <dl>
             {filas.map((f) => (
               <div key={f.id}>
@@ -111,8 +156,7 @@ export function Ayuda({ abierta, alCerrar }: Props) {
         <section>
           <h3>Créditos</h3>
           <ul>
-            <li>Letra de los textos: Atkinson Hyperlegible, del Braille Institute of America (licencia SIL Open Font License 1.1).</li>
-            <li>Dígitos de siete segmentos: DSEG7 Classic, de keshikan (licencia SIL Open Font License 1.1).</li>
+            <li>Letra: Atkinson Hyperlegible, del Braille Institute of America (licencia SIL Open Font License 1.1).</li>
             <li>Personajes, silla de ruedas y muleta de la escena 3D: «Mini Characters», de Kenney (www.kenney.nl), licencia Creative Commons Zero (CC0). Se recortaron los clips que no se usan, se ajustó el tamaño y se comprimieron.</li>
             <li>Datos: «Datos del ascensor y plan de simulación» (documento de la profesora) y los datos recolectados en el edificio.</li>
             <li>Hecho con React, Zustand y Vite. Todo corre en tu navegador: la página no pide nada a otros sitios.</li>

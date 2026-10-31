@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useApp } from '../store/app.ts';
-import { ConSubindice } from './Subindice.tsx';
-import { construirTabla, filasVacias, type Celda } from './tabla.ts';
+import { LEYENDA } from './resultados.ts';
+import { ConSubindice, Simbolo } from './Subindice.tsx';
+import { construirTabla, type Celda, type Fila, type TablaModelo } from './tabla.ts';
 
 function Valor({ celda }: { celda: Celda | null }) {
   if (!celda) {
@@ -26,84 +27,13 @@ function Valor({ celda }: { celda: Celda | null }) {
   );
 }
 
-export function TablaComparativa() {
-  const resultado = useApp((s) => s.resultado);
-  const obsoleto = useApp((s) => s.obsoleto);
-
-  const tabla = useMemo(() => (resultado ? construirTabla(resultado.entradas, resultado.comparacion) : null), [resultado]);
-  const filas = tabla?.filas ?? filasVacias();
-
-  return (
-    <div className="tabla-zona">
-      {!tabla && (
-        <p className="frase frase-vacia">
-          Las filas se llenan al simular. Para probar rápido, carga el caso del miércoles.
-        </p>
-      )}
-      {tabla?.frase && <p className="frase">{tabla.frase}</p>}
-      {obsoleto && (
-        <p role="status" className="obsoleto">
-          Cambiaste los datos: esta tabla es de la simulación anterior. Pulsa Simular para actualizarla.
-        </p>
-      )}
-
-      <table role="table" className={tabla ? 'tabla' : 'tabla tabla-vacia'}>
-        <caption className="sr-only">Comparación entre las fórmulas M/M/1/K y la simulación, promedio de 10 corridas</caption>
-        <thead role="rowgroup">
-          <tr role="row">
-            <th scope="col" role="columnheader">
-              Medida
-            </th>
-            <th scope="col" role="columnheader">
-              Fórmulas
-              <span className="sub">toda la franja</span>
-            </th>
-            <th scope="col" role="columnheader">
-              Fórmulas
-              <span className="sub">picos</span>
-            </th>
-            <th scope="col" role="columnheader" className="col-sim">
-              Simulación
-              <span className="sub">promedio de 10 ± desviación</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody role="rowgroup">
-          {filas.map((f) => (
-            <FilaTabla key={f.id} f={f} />
-          ))}
-          {tabla?.real && (
-            <tr role="row" className="fila-real">
-              <th scope="row" role="rowheader">
-                Real, miércoles
-                <span className="detalle">lo que se contó en el edificio</span>
-              </th>
-              <td role="cell" colSpan={3} data-label="Contado" className="real-valores">
-                <span className="celda">
-                  <span className="valor">{tabla.real.picos}</span> <span className="detalle-inline">en los picos</span>
-                  <br />
-                  <span className="valor">{tabla.real.total}</span> <span className="detalle-inline">en toda la franja</span>
-                </span>
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-
-      <p className="nota-tabla">
-        λ es personas ÷ duración; μ es la que mide la simulación. Cada número de la simulación es el promedio de 10 corridas y el ± es la desviación entre ellas. La Ayuda explica cada fila.
-      </p>
-    </div>
-  );
-}
-
-function FilaTabla({ f }: { f: ReturnType<typeof filasVacias>[number] }) {
+function FilaTabla({ f }: { f: Fila }) {
   return (
     <tr role="row" className={f.destacada ? 'fila-destacada' : undefined}>
       <th scope="row" role="rowheader">
         {f.etiqueta}
         {f.detalle && (
-          <span className="detalle">
+          <span className="detalle-fila">
             <ConSubindice texto={f.detalle} />
           </span>
         )}
@@ -114,9 +44,82 @@ function FilaTabla({ f }: { f: ReturnType<typeof filasVacias>[number] }) {
       <td role="cell" data-label="Fórmulas, picos">
         <Valor celda={f.picos} />
       </td>
-      <td role="cell" data-label="Simulación" className="col-sim">
+      <td role="cell" data-label="Simulación">
         <Valor celda={f.sim} />
       </td>
     </tr>
+  );
+}
+
+function Tabla({ tabla }: { tabla: TablaModelo }) {
+  return (
+    <table role="table" className="tabla">
+      <caption className="sr-only">Comparación entre las fórmulas M/M/1/K y la simulación, promedio de 10 corridas</caption>
+      <thead role="rowgroup">
+        <tr role="row">
+          <th scope="col" role="columnheader">
+            Medida
+          </th>
+          <th scope="col" role="columnheader">
+            Fórmulas
+            <span className="sub">toda la franja</span>
+          </th>
+          <th scope="col" role="columnheader">
+            Fórmulas
+            <span className="sub">picos</span>
+          </th>
+          <th scope="col" role="columnheader">
+            Simulación
+            <span className="sub">promedio de 10 ± desviación</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody role="rowgroup">
+        {tabla.filas.map((f) => (
+          <FilaTabla key={f.id} f={f} />
+        ))}
+        {tabla.real && (
+          <tr role="row" className="fila-real">
+            <th scope="row" role="rowheader">
+              Real, miércoles
+              <span className="detalle-fila">lo que se contó en el edificio</span>
+            </th>
+            <td role="cell" colSpan={3} className="real-valores">
+              <span className="celda">
+                <span className="valor">{tabla.real.picos}</span> <span className="detalle-inline">en los picos</span>
+                <br />
+                <span className="valor">{tabla.real.total}</span> <span className="detalle-inline">en toda la franja</span>
+              </span>
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+/** «Detalle para la clase»: qué es cada símbolo y la tabla técnica con las cifras de siempre. */
+export function DetalleParaLaClase() {
+  const resultado = useApp((s) => s.resultado);
+  const tabla = useMemo(() => (resultado ? construirTabla(resultado.entradas, resultado.comparacion) : null), [resultado]);
+  if (!tabla) return null;
+  return (
+    <section className="detalle" aria-labelledby="titulo-detalle">
+      <h3 id="titulo-detalle">Detalle para la clase</h3>
+      <dl className="simbolos">
+        {LEYENDA.map((s) => (
+          <div key={s.id}>
+            <dt>
+              <Simbolo id={s.id} />
+            </dt>
+            <dd>
+              <ConSubindice texto={s.texto} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {tabla.frase && <p className="frase-tabla">{tabla.frase}</p>}
+      <Tabla tabla={tabla} />
+    </section>
   );
 }

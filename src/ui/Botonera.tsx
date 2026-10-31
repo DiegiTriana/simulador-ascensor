@@ -1,10 +1,11 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { CAMBIOS_DE_CLASE, formatoHora } from '../data/horario.ts';
 import { INICIO_MAX_MIN, INICIO_MIN_MIN, RANGOS } from '../data/rangos.ts';
 import { tasaEsperadaPicos } from '../sim/llegadas.ts';
-import { leerHora, type Campo } from '../sim/validacion.ts';
-import { useApp, type SeleccionHora } from '../store/app.ts';
-import { Display7 } from './Display7.tsx';
+import type { Campo } from '../sim/validacion.ts';
+import { useApp, type SeccionAyuda, type SeleccionHora } from '../store/app.ts';
+import { Icono, type NombreIcono } from './Iconos.tsx';
+import { Aviso, Llamada } from './Llamada.tsx';
 import { coma } from './formato.ts';
 import { idCampo, useErrorVisible, useValidacion } from './validacionUi.ts';
 
@@ -21,19 +22,80 @@ function Mensaje({ id, texto }: { id: string; texto: string | undefined }) {
   );
 }
 
+/** El «?» de cada sección: abre la parte de la Ayuda que le corresponde. */
+export function MasAyuda({ seccion, de }: { seccion: SeccionAyuda; de: string }) {
+  const abrir = useApp((s) => s.abrirAyuda);
+  return (
+    <button type="button" className="mas" aria-haspopup="dialog" aria-label={`Ayuda: ${de}`} onClick={() => abrir(seccion)}>
+      <span aria-hidden="true">?</span>
+    </button>
+  );
+}
+
+function Paso({ numero, titulo, seccion, children }: { numero: number; titulo: string; seccion: SeccionAyuda; children: ReactNode }) {
+  const id = `paso-${numero}`;
+  return (
+    <section className="tarjeta paso" aria-labelledby={id}>
+      <header>
+        <span className="numero" aria-hidden="true">
+          {numero}
+        </span>
+        <h2 id={id}>{titulo}</h2>
+        <MasAyuda seccion={seccion} de={titulo} />
+      </header>
+      {children}
+    </section>
+  );
+}
+
+interface CampoUiProps {
+  icono: NombreIcono;
+  etiqueta: string;
+  ayuda: string;
+  /** Id del control (el `for` de la etiqueta). */
+  para: string;
+  error: string | undefined;
+  /** Los íconos de silla de ruedas y muletas van más grandes para que se reconozcan. */
+  iconoGrande?: boolean;
+  children: ReactNode;
+  extra?: ReactNode;
+}
+
+/** Un dato: ícono, nombre, una línea de ayuda con ejemplo y el control. */
+function CampoUi({ icono, etiqueta, ayuda, para, error, iconoGrande, children, extra }: CampoUiProps) {
+  return (
+    <div className="campo">
+      <Icono nombre={icono} grande={iconoGrande} />
+      <div className="campo-nombre">
+        <label htmlFor={para}>{etiqueta}</label>
+        <p id={`${para}-ayuda`} className="ayuda-campo">
+          {ayuda}
+        </p>
+      </div>
+      <div className="campo-control">{children}</div>
+      {extra}
+      <Mensaje id={`${para}-error`} texto={error} />
+    </div>
+  );
+}
+
+const describedBy = (id: string, error: string | undefined) => (error ? `${id}-ayuda ${id}-error` : `${id}-ayuda`);
+
 interface FilaConteoProps {
   campo: Extract<Campo, 'llegadasP1' | 'bajan' | 'sillas' | 'muletas' | 'usosAseo'>;
   etiqueta: string;
+  ayuda: string;
+  icono: NombreIcono;
+  iconoGrande?: boolean;
 }
 
-/** Fila de panel: nombre a la izquierda; a la derecha, campo de texto entre dos botones de llamada. */
-function FilaConteo({ campo, etiqueta }: FilaConteoProps) {
+/** Campo de texto entre dos botones − y +; el texto sigue siendo texto para validar coma, punto y letras. */
+function FilaConteo({ campo, etiqueta, ayuda, icono, iconoGrande }: FilaConteoProps) {
   const valor = useApp((s) => s.texto[campo]);
   const poner = useApp((s) => s.poner);
   const error = useErrorVisible(campo);
   const { min, max } = RANGOS[campo];
   const id = idCampo(campo);
-  const idError = `${id}-error`;
 
   const mover = (delta: number) => {
     const actual = /^\d+$/.test(valor.trim()) ? Number(valor.trim()) : 0;
@@ -41,29 +103,29 @@ function FilaConteo({ campo, etiqueta }: FilaConteoProps) {
   };
 
   return (
-    <div className="fila fila-conteo">
-      <label htmlFor={id}>{etiqueta}</label>
-      <button type="button" className="redondo" aria-label={`Restar uno: ${etiqueta}`} onClick={() => mover(-1)}>
-        <span aria-hidden="true">−</span>
-      </button>
-      <input
-        id={id}
-        name={campo}
-        className="campo campo-numero"
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        spellCheck={false}
-        value={valor}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? idError : undefined}
-        onChange={(e) => poner(campo, e.target.value)}
-      />
-      <button type="button" className="redondo" aria-label={`Sumar uno: ${etiqueta}`} onClick={() => mover(1)}>
-        <span aria-hidden="true">+</span>
-      </button>
-      <Mensaje id={idError} texto={error} />
-    </div>
+    <CampoUi icono={icono} iconoGrande={iconoGrande} etiqueta={etiqueta} ayuda={ayuda} para={id} error={error}>
+      <div className="contador">
+        <button type="button" className="boton-cuadrado" aria-label={`Restar uno: ${etiqueta}`} onClick={() => mover(-1)}>
+          <span aria-hidden="true">−</span>
+        </button>
+        <input
+          id={id}
+          name={campo}
+          className="campo-texto campo-numero"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          spellCheck={false}
+          value={valor}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy(id, error)}
+          onChange={(e) => poner(campo, e.target.value)}
+        />
+        <button type="button" className="boton-cuadrado" aria-label={`Sumar uno: ${etiqueta}`} onClick={() => mover(1)}>
+          <span aria-hidden="true">+</span>
+        </button>
+      </div>
+    </CampoUi>
   );
 }
 
@@ -76,23 +138,46 @@ function FilaHora() {
   const poner = useApp((s) => s.poner);
   const error = useErrorVisible('horaInicio');
   const id = idCampo('horaInicio');
-  const idError = `${id}-error`;
-
-  const leida = leerHora(texto);
-  const enRango = 'minutos' in leida && leida.minutos >= INICIO_MIN_MIN && leida.minutos <= INICIO_MAX_MIN;
-  const reloj = enRango ? formatoHora(leida.minutos) : undefined;
   const otra = seleccion === 'otra';
+  const idLista = otra ? `${id}-lista` : id;
+
 
   return (
-    <div className="fila fila-hora">
-      <label htmlFor={otra ? `${id}-lista` : id}>Hora de inicio</label>
+    <CampoUi
+      icono="hora"
+      etiqueta="Hora de inicio"
+      ayuda="A qué hora empieza lo que quieres simular. Ej.: 12:40, cuando cambia una clase."
+      para={idLista}
+      error={error}
+      extra={
+        otra ? (
+          <div className="hora-otra">
+            <label htmlFor={id}>Hora en formato de 24 horas (HH:MM)</label>
+            <input
+              id={id}
+              name="horaInicio"
+              className="campo-texto campo-hora"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="12:40"
+              value={texto}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? `${id}-error` : undefined}
+              onChange={(e) => poner('horaInicio', e.target.value)}
+            />
+          </div>
+        ) : null
+      }
+    >
       <select
-        id={otra ? `${id}-lista` : id}
+        id={idLista}
         name="horaLista"
-        className="campo campo-lista"
+        className="campo-texto campo-lista"
         value={seleccion}
         aria-invalid={error && !otra ? true : undefined}
-        aria-describedby={error ? idError : undefined}
+        aria-describedby={describedBy(idLista, error && !otra ? error : undefined)}
         onChange={(e) => ponerHora(e.target.value as SeleccionHora)}
       >
         <option value="">Elige la hora</option>
@@ -103,28 +188,7 @@ function FilaHora() {
         ))}
         <option value="otra">Otra hora</option>
       </select>
-      <Display7 texto={reloj} plantilla="88:88" etiqueta={reloj ? `Hora de inicio: ${reloj}` : 'Hora de inicio sin elegir'} />
-      {otra && (
-        <div className="fila-hora-otra">
-          <label htmlFor={id}>Hora en formato de 24 horas (HH:MM)</label>
-          <input
-            id={id}
-            name="horaInicio"
-            className="campo campo-texto-hora"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="12:40"
-            value={texto}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? idError : undefined}
-            onChange={(e) => poner('horaInicio', e.target.value)}
-          />
-        </div>
-      )}
-      <Mensaje id={idError} texto={error} />
-    </div>
+    </CampoUi>
   );
 }
 
@@ -133,30 +197,29 @@ function FilaDuracion() {
   const poner = useApp((s) => s.poner);
   const error = useErrorVisible('duracion');
   const id = idCampo('duracion');
-  const idError = `${id}-error`;
   return (
-    <div className="fila fila-duracion">
-      <label htmlFor={id}>Duración</label>
-      <input
-        id={id}
-        name="duracion"
-        className="campo campo-numero"
-        type="text"
-        inputMode="numeric"
-        autoComplete="off"
-        spellCheck={false}
-        value={valor}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? idError : undefined}
-        onChange={(e) => poner('duracion', e.target.value)}
-      />
-      <span className="unidad">min</span>
-      <Mensaje id={idError} texto={error} />
-    </div>
+    <CampoUi icono="duracion" etiqueta="Duración" ayuda="Cuántos minutos dura la franja. Ej.: 50." para={id} error={error}>
+      <div className="con-unidad">
+        <input
+          id={id}
+          name="duracion"
+          className="campo-texto campo-numero"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          spellCheck={false}
+          value={valor}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy(id, error)}
+          onChange={(e) => poner('duracion', e.target.value)}
+        />
+        <span className="unidad">min</span>
+      </div>
+    </CampoUi>
   );
 }
 
-/** «Llegan unas 2,4 personas por minuto; 3,7 en los picos»: explica el aviso de saturación. */
+/** «Llegan unas 2,4 personas por minuto; 3,7 en los picos»: explica el aviso de saturación y qué son los picos. */
 function LecturaPrevia() {
   const v = useValidacion();
   if (!v.ok) return null;
@@ -166,7 +229,7 @@ function LecturaPrevia() {
   const texto =
     picos === null
       ? `Llegan unas ${coma(franja)} personas por minuto, parejas en toda la franja (no hay cambio de clase).`
-      : `Llegan unas ${coma(franja)} personas por minuto; ${coma(picos)} en los picos.`;
+      : `Llegan unas ${coma(franja)} personas por minuto; ${coma(picos)} en los picos (los 12,5 minutos antes y después de cada cambio de clase).`;
   return <p className="lectura-previa">{texto}</p>;
 }
 
@@ -184,7 +247,7 @@ function Avanzado() {
         </p>
         <button
           type="button"
-          className="plano"
+          className="boton"
           aria-describedby={idAyuda}
           disabled={fase === 'simulando'}
           onClick={() => {
@@ -199,25 +262,65 @@ function Avanzado() {
   );
 }
 
+/** Los cuatro pasos: cuándo, cuánta gente, casos especiales y simular. */
 export function Botonera() {
   const cargar = useApp((s) => s.cargarMiercoles);
   return (
-    <section className="placa" aria-labelledby="titulo-datos">
-      <h2 id="titulo-datos" className="sr-only">
-        Datos de la simulación
-      </h2>
-      <FilaHora />
-      <FilaDuracion />
-      <FilaConteo campo="llegadasP1" etiqueta="Personas que llegan a P1 para subir" />
-      <FilaConteo campo="bajan" etiqueta="Personas que bajan" />
-      <FilaConteo campo="sillas" etiqueta="Personas en silla de ruedas" />
-      <FilaConteo campo="muletas" etiqueta="Personas con muletas" />
-      <FilaConteo campo="usosAseo" etiqueta="Veces que el aseo usa el ascensor" />
-      <LecturaPrevia />
-      <button type="button" className="plano plano-ancho" onClick={cargar}>
-        Cargar el caso del miércoles
-      </button>
-      <Avanzado />
-    </section>
+    <>
+      <section className="tarjeta atajo" aria-label="Atajo">
+        <p>
+          <strong>¿No sabes qué poner?</strong> Carga el caso real del miércoles.
+        </p>
+        <button type="button" className="boton" onClick={cargar}>
+          Cargar el caso del miércoles
+        </button>
+      </section>
+
+      <Paso numero={1} titulo="¿Cuándo?" seccion="cuando">
+        <FilaHora />
+        <FilaDuracion />
+      </Paso>
+
+      <Paso numero={2} titulo="¿Cuánta gente?" seccion="gente">
+        <FilaConteo
+          campo="llegadasP1"
+          icono="suben"
+          etiqueta="Llegan a P1 para subir"
+          ayuda="Personas que llegan a la planta baja y quieren subir. Ej.: 119 en 50 min el miércoles."
+        />
+        <FilaConteo campo="bajan" icono="bajan" etiqueta="Bajan" ayuda="Personas que bajan en el ascensor hacia P1, P2 o P3. Ej.: 19." />
+      </Paso>
+
+      <Paso numero={3} titulo="Casos especiales" seccion="especiales">
+        <FilaConteo
+          campo="sillas"
+          icono="silla"
+          iconoGrande
+          etiqueta="Sillas de ruedas"
+          ayuda="Ocupan 3 cupos y suben primero. Se cuentan entre las que llegan. Ej.: 0."
+        />
+        <FilaConteo
+          campo="muletas"
+          icono="muleta"
+          iconoGrande
+          etiqueta="Muletas"
+          ayuda="Ocupan 2 cupos y suben primero. Se cuentan entre las que llegan. Ej.: 0."
+        />
+        <FilaConteo
+          campo="usosAseo"
+          icono="aseo"
+          etiqueta="Usos del aseo"
+          ayuda="Veces que el personal de aseo usa el ascensor con su carrito; lo deja ocupado 2 min 30 s. Ej.: 1."
+        />
+      </Paso>
+
+      <Paso numero={4} titulo="Simular" seccion="simular">
+        <LecturaPrevia />
+        <Aviso />
+        <p className="que-pasa">Se simula 10 veces la misma franja y se promedia.</p>
+        <Llamada />
+        <Avanzado />
+      </Paso>
+    </>
   );
 }
