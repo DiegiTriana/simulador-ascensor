@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { CASO_MIERCOLES } from '../data/casos.ts';
 import type { WorkerMinimo } from '../worker/cliente.ts';
 import type { Peticion, Respuesta } from '../worker/protocolo.ts';
+import { corridaAnimada } from '../sim/corridas.ts';
+import { useAnimacion } from './animacion.ts';
 import { useApp, usarFabricaDeWorker } from './app.ts';
 
 class FalsoWorker implements WorkerMinimo {
@@ -24,6 +26,7 @@ beforeEach(() => {
   worker = new FalsoWorker();
   usarFabricaDeWorker(() => worker);
   useApp.setState(useApp.getInitialState(), true);
+  useAnimacion.setState(useAnimacion.getInitialState(), true);
 });
 
 const generacionEnviada = () => (worker.enviados.find((m) => m.tipo === 'simular') as Extract<Peticion, { tipo: 'simular' }>).generacion;
@@ -113,5 +116,58 @@ describe('estado de la aplicación', () => {
     const m = worker.enviados[0] as Extract<Peticion, { tipo: 'simular' }>;
     expect(m.semilla).not.toBe(1);
     expect(useApp.getState().semilla).toBe(m.semilla);
+  });
+
+  describe('la corrida que se anima', () => {
+    const traza = corridaAnimada(CASO_MIERCOLES, 1).traza;
+    const simulada = () => {
+      useApp.getState().cargarMiercoles();
+      useApp.getState().simular();
+      return generacionEnviada();
+    };
+
+    it('llega con la traza y queda con las entradas simuladas', () => {
+      const g = simulada();
+      expect(useAnimacion.getState().corrida).toBeNull();
+      worker.responder({ tipo: 'traza', generacion: g, traza });
+      const c = useAnimacion.getState().corrida;
+      expect(c?.traza).toBe(traza);
+      expect(c?.entradas).toEqual(CASO_MIERCOLES);
+      expect(useAnimacion.getState().enMarcha).toBe(true);
+    });
+
+    it('simular de nuevo la descarta; la traza de la corrida anterior, si llega tarde, no la trae de vuelta', () => {
+      const g1 = simulada();
+      worker.responder({ tipo: 'traza', generacion: g1, traza });
+      expect(useAnimacion.getState().corrida).not.toBeNull();
+      useApp.getState().simular();
+      expect(useAnimacion.getState().corrida).toBeNull();
+      worker.responder({ tipo: 'traza', generacion: g1, traza });
+      expect(useAnimacion.getState().corrida).toBeNull();
+    });
+
+    it('cambiar una entrada la descarta (y marca el resultado como viejo)', () => {
+      const g = simulada();
+      worker.responder({ tipo: 'traza', generacion: g, traza });
+      worker.responder({ tipo: 'resultado', generacion: g, comparacion: { sim: {} } as never });
+      expect(useAnimacion.getState().corrida).not.toBeNull();
+      useApp.getState().poner('bajan', '10');
+      expect(useAnimacion.getState().corrida).toBeNull();
+      expect(useApp.getState().obsoleto).toBe(true);
+    });
+
+    it('cancelar y cargar otro caso la descartan', () => {
+      const g = simulada();
+      worker.responder({ tipo: 'traza', generacion: g, traza });
+      useApp.getState().cancelar();
+      expect(useAnimacion.getState().corrida).toBeNull();
+      useApp.getState().cargarMiercoles();
+      useApp.getState().simular();
+      const g2 = (worker.enviados.filter((m) => m.tipo === 'simular').at(-1) as Extract<Peticion, { tipo: 'simular' }>).generacion;
+      worker.responder({ tipo: 'traza', generacion: g2, traza });
+      expect(useAnimacion.getState().corrida).not.toBeNull();
+      useApp.getState().cargarMiercoles();
+      expect(useAnimacion.getState().corrida).toBeNull();
+    });
   });
 });

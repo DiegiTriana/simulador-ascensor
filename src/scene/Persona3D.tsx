@@ -1,67 +1,117 @@
-// Una persona: el modelo de Kenney clonado, en la pose `idle` (quieta, sin reloj propio: en la parte 2 la
-// pose saldrá del reloj simulado). Si el modelo no carga, se dibuja una figura simple del mismo tamaño.
+// Una persona: el modelo de Kenney clonado. Su lugar, hacia dónde mira y su pose (quieta con `idle` o caminando con
+// `walk`) se los pone `aplicarVista` en cada cuadro, a partir del reloj simulado: la pose sale de la distancia
+// recorrida o es fija, nunca del reloj real. Si el modelo no carga, se dibuja una figura simple del mismo tamaño.
 
 import { useThree } from '@react-three/fiber';
-import { useEffect, useMemo } from 'react';
-import { AnimationMixer } from 'three';
+import { useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
+import { AnimationMixer, type Group } from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import { ALTURA_PERSONA } from '../data/modelos.ts';
 import type { TipoPersona } from '../sim/tipos.ts';
-import { desvio } from './disposicion.ts';
+import type { Manejadores } from './manejadores.ts';
 import { nombreModelo, useModelo } from './modelos.ts';
 import { PALETA } from './paleta.ts';
-import type { Vec3 } from './vistas.ts';
+import type { PersonaVista } from './vista.ts';
 
 interface Props {
   id: number;
   tipo: TipoPersona;
-  posicion: Vec3;
-  giro: number;
+  manejadores: Manejadores;
 }
 
 const COLORES_FIGURA = [PALETA.azul, PALETA.amarillo, PALETA.verde, PALETA.rojo, PALETA.lila, PALETA.naranja];
 
-export function Persona3D({ id, tipo, posicion, giro }: Props) {
+type AplicarPose = (v: PersonaVista) => void;
+
+export function Persona3D({ id, tipo, manejadores }: Props) {
+  const grupo = useRef<Group>(null);
+  const pose = useRef<AplicarPose | null>(null);
   const modelo = useModelo(nombreModelo(tipo, id));
+
+  // Se registra para que aplicarVista la mueva; si ya hay una pose pedida para ella, la toma de una vez.
+  useLayoutEffect(() => {
+    const g = grupo.current;
+    if (!g) return;
+    const manejador = {
+      poner(v: PersonaVista) {
+        g.position.set(v.x, v.y, v.z);
+        g.rotation.y = v.giro;
+        pose.current?.(v);
+      },
+    };
+    manejadores.personas.set(id, manejador);
+    const inicial = manejadores.ultima.get(id);
+    if (inicial) manejador.poner(inicial);
+    return () => {
+      if (manejadores.personas.get(id) === manejador) manejadores.personas.delete(id);
+    };
+  }, [id, manejadores]);
+
   return (
-    <group position={posicion} rotation={[0, giro, 0]}>
-      {modelo.estado === 'listo' && <ModeloClonado gltf={modelo.gltf} id={id} />}
+    <group ref={grupo}>
+      {modelo.estado === 'listo' && <ModeloClonado gltf={modelo.gltf} id={id} pose={pose} manejadores={manejadores} />}
       {modelo.estado === 'error' && <FiguraSimple id={id} />}
     </group>
   );
 }
 
-function ModeloClonado({ gltf, id }: { gltf: GLTF; id: number }) {
+function ModeloClonado({
+  gltf,
+  id,
+  pose,
+  manejadores,
+}: {
+  gltf: GLTF;
+  id: number;
+  pose: MutableRefObject<AplicarPose | null>;
+  manejadores: Manejadores;
+}) {
   const invalidar = useThree((s) => s.invalidate);
-  const { raiz, mezclador } = useMemo(() => {
+  const { raiz, mezclador, quieta, camina } = useMemo(() => {
     const raiz = clone(gltf.scene);
     raiz.traverse((o) => {
       o.castShadow = true;
       o.receiveShadow = true;
     });
     const mezclador = new AnimationMixer(raiz);
-    const idle = gltf.animations.find((a) => a.name === 'idle');
-    if (idle) {
-      mezclador.clipAction(idle).play();
-      // Pose fija: cada persona queda en un punto distinto del ciclo para que no sean idénticas.
-      mezclador.setTime((desvio(id, 7) + 0.5) * idle.duration);
-    }
-    return { raiz, mezclador };
-  }, [gltf, id]);
-  useEffect(() => {
+    const clipQuieta = gltf.animations.find((a) => a.name === 'idle');
+    const clipCamina = gltf.animations.find((a) => a.name === 'walk');
+    const quieta = clipQuieta ? mezclador.clipAction(clipQuieta).play() : null;
+    const camina = clipCamina ? mezclador.clipAction(clipCamina).play() : null;
+    return { raiz, mezclador, quieta, camina };
+  }, [gltf]);
+
+  useLayoutEffect(() => {
+    let ultima = '';
+    pose.current = (v) => {
+      const andando = v.caminando && camina !== null;
+      const accion = andando ? camina : quieta;
+      if (!accion) return;
+      const fase = ((v.ciclos % 1) + 1) % 1;
+      const clave = `${andando ? 1 : 0}:${fase.toFixed(3)}`;
+      if (clave === ultima) return; // la pose no cambió: no se recalcula el esqueleto
+      ultima = clave;
+      if (quieta) quieta.weight = andando ? 0 : 1;
+      if (camina) camina.weight = andando ? 1 : 0;
+      mezclador.setTime(fase * accion.getClip().duration);
+    };
+    const inicial = manejadores.ultima.get(id);
+    if (inicial) pose.current(inicial);
     invalidar();
     return () => {
+      pose.current = null;
       mezclador.stopAllAction();
       mezclador.uncacheRoot(raiz);
     };
-  }, [mezclador, raiz, invalidar]);
+  }, [mezclador, raiz, quieta, camina, pose, manejadores, id, invalidar]);
+
   return <primitive object={raiz} />;
 }
 
 /** Figura de respaldo: cuerpo y cabeza de cubo, de la altura de una persona. */
 function FiguraSimple({ id }: { id: number }) {
-  const color = COLORES_FIGURA[id % COLORES_FIGURA.length];
+  const color = COLORES_FIGURA[Math.abs(id) % COLORES_FIGURA.length];
   const alto = ALTURA_PERSONA;
   return (
     <group>

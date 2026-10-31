@@ -2,7 +2,7 @@
 // cambiar las entradas sube la generación; todo mensaje de una generación anterior se descarta.
 
 import type { Comparacion } from '../sim/corridas.ts';
-import type { Entradas } from '../sim/tipos.ts';
+import type { Entradas, Traza } from '../sim/tipos.ts';
 import { CORRIDAS_DEFECTO, type Peticion, type Respuesta } from './protocolo.ts';
 
 /** Lo mínimo que se usa de un Worker (permite probar con uno falso). */
@@ -16,6 +16,7 @@ export interface WorkerMinimo {
 
 export interface Escuchas {
   alProgreso(hechas: number, total: number): void;
+  alTraza(traza: Traza): void;
   alResultado(comparacion: Comparacion): void;
   alError(mensaje: string): void;
 }
@@ -102,6 +103,9 @@ export class ClienteSim {
     switch (r.tipo) {
       case 'progreso':
         this.escuchas.alProgreso(r.hechas, r.total);
+        break;
+      case 'traza':
+        this.escuchas.alTraza(r.traza);
         break;
       case 'resultado':
         this.enMarcha = false;

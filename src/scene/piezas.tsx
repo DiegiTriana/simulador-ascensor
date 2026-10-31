@@ -3,7 +3,7 @@
 
 import { RoundedBox } from '@react-three/drei';
 import { useLayoutEffect, useMemo, useRef } from 'react';
-import { BoxGeometry, DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3 } from 'three';
+import { BoxGeometry, DoubleSide, InstancedMesh, Matrix4, Quaternion, Vector3, type Mesh } from 'three';
 import type { Vec3 } from './vistas.ts';
 
 interface PropsCaja {
@@ -16,13 +16,16 @@ interface PropsCaja {
   rotacionY?: number;
   sombra?: boolean;
   recibeSombra?: boolean;
+  /** Recibe la malla al montarse (y null al desmontarse), para moverla sin pasar por React. */
+  alMontar?: (malla: Mesh | null) => void;
 }
 
 /** Caja de bordes un poco redondeados, de un color plano. */
-export function Caja({ posicion, tam, color, radio = 0.07, rotacionY = 0, sombra = true, recibeSombra = true }: PropsCaja) {
+export function Caja({ posicion, tam, color, radio = 0.07, rotacionY = 0, sombra = true, recibeSombra = true, alMontar }: PropsCaja) {
   const r = Math.max(0.005, Math.min(radio, Math.min(...tam) / 2 - 0.005));
   return (
     <RoundedBox
+      ref={alMontar}
       args={tam}
       radius={r}
       smoothness={2}

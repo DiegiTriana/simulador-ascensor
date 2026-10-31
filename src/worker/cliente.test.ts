@@ -31,6 +31,7 @@ function preparar() {
     },
     {
       alProgreso: (h, t) => eventos.push(`progreso ${h}/${t}`),
+      alTraza: () => eventos.push('traza'),
       alResultado: () => eventos.push('resultado'),
       alError: (m) => eventos.push(`error ${m}`),
     },
@@ -102,9 +103,20 @@ describe('cliente del worker', () => {
       () => {
         throw new Error('sin workers');
       },
-      { alProgreso: () => {}, alResultado: () => {}, alError: (m) => eventos.push(m) },
+      { alProgreso: () => {}, alTraza: () => {}, alResultado: () => {}, alError: (m) => eventos.push(m) },
     );
     expect(() => c.simular(CASO_MIERCOLES, 1)).not.toThrow();
     expect(eventos).toEqual(['sin workers']);
+  });
+
+  it('entrega la traza de la generación vigente y descarta la de una anterior', () => {
+    const { cliente, workers, eventos } = preparar();
+    const g1 = cliente.simular(CASO_MIERCOLES, 1);
+    const g2 = cliente.simular(CASO_MIERCOLES, 2);
+    workers[0].responder({ tipo: 'traza', generacion: g1, traza: {} as never });
+    expect(eventos).toEqual([]);
+    workers[0].responder({ tipo: 'traza', generacion: g2, traza: {} as never });
+    workers[0].responder({ tipo: 'resultado', generacion: g2, comparacion: {} as never });
+    expect(eventos).toEqual(['traza', 'resultado']);
   });
 });

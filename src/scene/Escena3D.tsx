@@ -1,21 +1,21 @@
 // Lienzo de la escena 3D (un solo ascensor). Se carga aparte (React.lazy) para que el formulario no espere a three.
-// En esta parte dibuja un estado fijo de prueba; en la parte 2 lo dará el reloj simulado.
+// Sin corrida dibuja un estado fijo de muestra; con una corrida, la sigue segundo a segundo con el reloj simulado.
 
-import { Canvas } from '@react-three/fiber';
-import { useMemo, useSyncExternalStore } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import type { TipoPersona } from '../sim/tipos.ts';
+import { useAnimacion } from '../store/animacion.ts';
 import { useEscena } from '../store/escena.ts';
 import { Camara } from './Camara.tsx';
+import { estadoEn } from './corrida.ts';
 import { Edificio } from './Edificio.tsx';
-import { lugarEnFila } from './disposicion.ts';
-import { estadoDePrueba, estadoDePruebaConParametros, type EstadoEscena } from './estado.ts';
-import { yPiso } from './medidas.ts';
+import { estadoDePrueba, estadoDePruebaConParametros } from './estado.ts';
+import { aplicarVista, crearManejadores, type Manejadores } from './manejadores.ts';
 import { Pasillo } from './Pasillo.tsx';
 import { Persona3D } from './Persona3D.tsx';
 import { Torre } from './Torre.tsx';
+import { aVista, type EstadoVista } from './vista.ts';
 import { poseExterior } from './vistas.ts';
-
-/** Personas que se dibujan como máximo por piso (la parte 3 pone el rótulo «+N personas» con el resto). */
-const MAX_POR_PISO = 12;
 
 const consulta = '(prefers-reduced-motion: reduce)';
 function suscribir(aviso: () => void) {
@@ -43,8 +43,9 @@ export default function Escena3D({ alPerderContexto }: Props) {
   const encuadre = useEscena((s) => s.encuadre);
   const orden = useEscena((s) => s.orden);
   const sinMovimiento = useSinMovimiento();
-  const estado = useMemo<EstadoEscena>(
-    () => (import.meta.env.DEV ? estadoDePruebaConParametros(window.location.search) : estadoDePrueba()),
+  const manejadores = useMemo<Manejadores>(crearManejadores, []);
+  const muestra = useMemo(
+    () => aVista(import.meta.env.DEV ? estadoDePruebaConParametros(window.location.search) : estadoDePrueba()),
     [],
   );
   const pose = poseExterior(1.3);
@@ -65,8 +66,9 @@ export default function Escena3D({ alPerderContexto }: Props) {
     >
       <Luces />
       <Edificio />
-      <Torre cabina={estado.cabina} />
-      <Filas filas={estado.filas} />
+      <Torre manejadores={manejadores} />
+      <Poblacion manejadores={manejadores} />
+      <Animador manejadores={manejadores} muestra={muestra} />
       {vista === 'piso' && <Pasillo piso={piso} />}
       <Camara vista={vista} piso={piso} encuadre={encuadre} orden={orden} sinMovimiento={sinMovimiento} />
     </Canvas>
@@ -96,16 +98,53 @@ function Luces() {
   );
 }
 
-/** Quienes esperan en el vestíbulo de cada piso, frente a la puerta. */
-function Filas({ filas }: { filas: EstadoEscena['filas'] }) {
+/** Las personas que se dibujan ahora. Solo se vuelve a dibujar cuando cambia quién está, no en cada cuadro. */
+function Poblacion({ manejadores }: { manejadores: Manejadores }) {
+  const [lista, setLista] = useState<{ id: number; tipo: TipoPersona }[]>([]);
+  useEffect(() => {
+    manejadores.alCambiarPersonas = setLista;
+    return () => {
+      manejadores.alCambiarPersonas = null;
+    };
+  }, [manejadores]);
   return (
     <group>
-      {filas.flatMap((fila, piso) =>
-        fila.slice(0, MAX_POR_PISO).map((p, i) => {
-          const lugar = lugarEnFila(i, p.id);
-          return <Persona3D key={p.id} id={p.id} tipo={p.tipo} posicion={[lugar.x, yPiso(piso), lugar.z]} giro={lugar.giro} />;
-        }),
-      )}
+      {lista.map((p) => (
+        <Persona3D key={p.id} id={p.id} tipo={p.tipo} manejadores={manejadores} />
+      ))}
     </group>
   );
+}
+
+/**
+ * Lleva el reloj simulado y coloca todo en cada cuadro. Mientras la corrida está en marcha pide cuadros sin parar; en
+ * pausa no pide ninguno, y la escena queda exactamente como estaba. Cualquier cambio del almacén (mover la barra,
+ * reiniciar, corrida nueva o descartada) pide un cuadro para recolocar.
+ */
+function Animador({ manejadores, muestra }: { manejadores: Manejadores; muestra: EstadoVista }) {
+  const invalidar = useThree((s) => s.invalidate);
+  const anterior = useRef<number | null>(null);
+
+  useEffect(() => useAnimacion.subscribe(() => invalidar()), [invalidar]);
+
+  useFrame(() => {
+    const a = useAnimacion.getState();
+    const corrida = a.corrida;
+    if (!corrida) {
+      anterior.current = null;
+      aplicarVista(manejadores, muestra);
+      return;
+    }
+    if (a.enMarcha) {
+      const ahora = performance.now();
+      // El primer cuadro después de una pausa no avanza el reloj: no se cuenta el rato que estuvo quieto.
+      if (anterior.current !== null) a.avanzar((ahora - anterior.current) / 1000);
+      anterior.current = ahora;
+    } else {
+      anterior.current = null;
+    }
+    aplicarVista(manejadores, estadoEn(corrida.indice, corrida.reloj.t));
+    if (useAnimacion.getState().enMarcha) invalidar();
+  });
+  return null;
 }

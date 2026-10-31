@@ -1,10 +1,10 @@
 // Lógica del worker sin tocar `self`: recibe peticiones y envía respuestas por una función.
 // Así se prueba en Node igual que corre en el navegador.
 
-import { comparar, semillaDeCorrida } from '../sim/corridas.ts';
+import { comparar, corridaAnimada, semillaDeCorrida } from '../sim/corridas.ts';
 import { validarEntradas } from '../sim/llegadas.ts';
 import { CONFIG_DEFECTO, simularEntradas } from '../sim/simulacion.ts';
-import type { Resultado } from '../sim/tipos.ts';
+import type { Resultado, Traza } from '../sim/tipos.ts';
 import type { Peticion, Respuesta } from './protocolo.ts';
 
 /** Cede el hilo para que el worker pueda recibir un mensaje de cancelación entre corrida y corrida. */
@@ -22,6 +22,7 @@ export function crearNucleo(enviar: (r: Respuesta) => void) {
       if (!Number.isFinite(semilla)) throw new RangeError('Semilla inválida');
       validarEntradas(entradas);
       const resultados: Resultado[] = [];
+      let traza: Traza | null = null;
       enviar({ tipo: 'progreso', generacion, hechas: 0, total: corridas });
       for (let i = 0; i < corridas; i++) {
         await ceder();
@@ -29,7 +30,14 @@ export function crearNucleo(enviar: (r: Respuesta) => void) {
           enviar({ tipo: 'cancelado', generacion });
           return;
         }
-        resultados.push(simularEntradas(entradas, semillaDeCorrida(semilla, i), CONFIG_DEFECTO));
+        if (i === 0) {
+          // La primera corrida es la que se anima: se corre una sola vez, con su traza.
+          const animada = corridaAnimada(entradas, semilla);
+          traza = animada.traza;
+          resultados.push(animada.resultado);
+        } else {
+          resultados.push(simularEntradas(entradas, semillaDeCorrida(semilla, i), CONFIG_DEFECTO));
+        }
         enviar({ tipo: 'progreso', generacion, hechas: i + 1, total: corridas });
       }
       await ceder();
@@ -37,6 +45,7 @@ export function crearNucleo(enviar: (r: Respuesta) => void) {
         enviar({ tipo: 'cancelado', generacion });
         return;
       }
+      if (traza) enviar({ tipo: 'traza', generacion, traza });
       enviar({ tipo: 'resultado', generacion, comparacion: comparar(entradas, resultados) });
     } catch (e) {
       if (vigente === generacion) enviar({ tipo: 'error', generacion, mensaje: e instanceof Error ? e.message : String(e) });

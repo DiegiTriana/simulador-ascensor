@@ -2,7 +2,9 @@
 import { lazy, Suspense, useState } from 'react';
 import { LimiteDeErrores, webglDisponible } from '../scene/Limite.tsx';
 import { PISO_MAXIMO } from '../scene/medidas.ts';
+import { useAnimacion } from '../store/animacion.ts';
 import { useEscena } from '../store/escena.ts';
+import { IndicadoresEnVivo, Reproductor } from './CorridaEnVivo.tsx';
 
 const Escena3D = lazy(() => import('../scene/Escena3D.tsx'));
 
@@ -11,6 +13,7 @@ const PISOS = Array.from({ length: PISO_MAXIMO }, (_, i) => i + 1);
 export function Escena() {
   const vista = useEscena((s) => s.vista);
   const piso = useEscena((s) => s.piso);
+  const corrida = useAnimacion((s) => s.corrida);
   const [sinContexto, setSinContexto] = useState(false);
   const mostrar3D = webglDisponible() && !sinContexto;
   const descripcion =
@@ -20,6 +23,7 @@ export function Escena() {
 
   return (
     <section className="escena" aria-label="Escena del ascensor">
+      {mostrar3D && corrida && <IndicadoresEnVivo corrida={corrida} />}
       <div className="escena-lienzo" role={mostrar3D ? 'img' : undefined} aria-label={mostrar3D ? descripcion : undefined}>
         {mostrar3D ? (
           <LimiteDeErrores respaldo={(mensaje) => <AvisoSinEscena detalle={mensaje} />}>
@@ -30,8 +34,9 @@ export function Escena() {
         ) : (
           <AvisoSinEscena />
         )}
-        {mostrar3D && <span className="escena-etiqueta">Escena de muestra</span>}
+        {mostrar3D && !corrida && <span className="escena-etiqueta">Escena de muestra. Pulsa Simular para ver una corrida.</span>}
       </div>
+      {mostrar3D && corrida && <Reproductor corrida={corrida} />}
       {mostrar3D && <BarraDeEscena />}
     </section>
   );

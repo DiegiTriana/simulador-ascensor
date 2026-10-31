@@ -10,6 +10,7 @@ import { otraSemilla, SEMILLA_DEFECTO } from '../sim/semilla.ts';
 import type { Entradas } from '../sim/tipos.ts';
 import { validar, type Campo, type EntradasTexto } from '../sim/validacion.ts';
 import { CORRIDAS_DEFECTO } from '../worker/protocolo.ts';
+import { useAnimacion } from './animacion.ts';
 import { ClienteSim, crearWorkerReal, type WorkerMinimo } from '../worker/cliente.ts';
 
 /** Campos en el orden en que aparecen en la botonera. */
@@ -72,6 +73,10 @@ let idResultado = 0;
 /** Las entradas de la simulación que corre ahora (el worker solo devuelve el resultado). */
 let entradasEnCurso: Entradas | null = null;
 
+/** Con «reducir movimiento», la animación espera a que la persona la reproduzca. */
+const pideMenosMovimiento = (): boolean =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 /** Para las pruebas: cambia el worker real por uno falso y descarta el cliente actual. */
 export function usarFabricaDeWorker(f: () => WorkerMinimo): void {
   cliente?.cerrar();
@@ -82,6 +87,9 @@ export function usarFabricaDeWorker(f: () => WorkerMinimo): void {
 function clienteActivo(): ClienteSim {
   cliente ??= new ClienteSim(() => fabrica(), {
     alProgreso: (hechas, total) => useApp.setState({ progreso: { hechas, total } }),
+    alTraza: (traza) => {
+      if (entradasEnCurso) useAnimacion.getState().cargar(traza, entradasEnCurso, { enMarcha: !pideMenosMovimiento() });
+    },
     alResultado: (comparacion) => {
       if (!entradasEnCurso) return;
       useApp.setState({
@@ -101,6 +109,7 @@ export const useApp = create<Estado>()((set, get) => {
   /** Las entradas cambiaron: lo que corre ya no sirve y lo que se ve deja de coincidir. */
   const alCambiarEntradas = () => {
     cliente?.invalidar();
+    useAnimacion.getState().descartar();
     const s = get();
     if (s.fase === 'simulando') set({ fase: 'inactivo', progreso: null });
     else if (s.fase === 'cancelado' || s.fase === 'error') set({ fase: 'inactivo', progreso: null, mensajeError: null });
@@ -158,6 +167,7 @@ export const useApp = create<Estado>()((set, get) => {
         return CAMPOS.find((c) => v.errores[c] !== undefined) ?? null;
       }
       entradasEnCurso = v.entradas;
+      useAnimacion.getState().descartar();
       set({
         intento: true,
         fase: 'simulando',
@@ -173,6 +183,7 @@ export const useApp = create<Estado>()((set, get) => {
     cancelar() {
       if (get().fase !== 'simulando') return;
       cliente?.cancelar();
+      useAnimacion.getState().descartar();
       set({ fase: 'cancelado', progreso: null });
     },
 

@@ -2,7 +2,7 @@
 // quien recibe descarta lo que no sea de la generación vigente.
 
 import type { Comparacion } from '../sim/corridas.ts';
-import type { Entradas } from '../sim/tipos.ts';
+import type { Entradas, Traza } from '../sim/tipos.ts';
 
 export interface PeticionSimular {
   tipo: 'simular';
@@ -22,6 +22,8 @@ export type Peticion = PeticionSimular | PeticionCancelar;
 
 export type Respuesta =
   | { tipo: 'progreso'; generacion: number; hechas: number; total: number }
+  /** La traza de la corrida 1 (la que se anima). Llega justo antes del resultado, con la misma generación. */
+  | { tipo: 'traza'; generacion: number; traza: Traza }
   | { tipo: 'resultado'; generacion: number; comparacion: Comparacion }
   | { tipo: 'cancelado'; generacion: number }
   | { tipo: 'error'; generacion: number; mensaje: string };

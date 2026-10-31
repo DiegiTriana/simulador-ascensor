@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CASO_MIERCOLES } from '../data/casos.ts';
-import { correrVarias, comparar } from '../sim/corridas.ts';
+import { correrVarias, comparar, corridaAnimada } from '../sim/corridas.ts';
 import { crearNucleo } from './nucleo.ts';
 import type { Respuesta } from './protocolo.ts';
 
@@ -62,5 +62,34 @@ describe('núcleo del worker', () => {
     await hasta((r) => r.tipo === 'error' && r.generacion === 2);
     const err = salida.find((r) => r.tipo === 'error');
     expect(err && err.tipo === 'error' && err.mensaje.length).toBeGreaterThan(0);
+  });
+
+  it('manda la traza de la corrida 1 justo antes del resultado, con la misma generación', async () => {
+    const { salida, nucleo, hasta } = preparar();
+    nucleo.recibir({ tipo: 'simular', generacion: 7, entradas: CASO_MIERCOLES, semilla: 3, corridas: 3 });
+    await hasta((r) => r.tipo === 'resultado');
+    const tipos = salida.map((r) => r.tipo);
+    const iTraza = tipos.indexOf('traza');
+    expect(iTraza).toBeGreaterThan(-1);
+    expect(tipos[iTraza + 1]).toBe('resultado');
+    expect(tipos.filter((t) => t === 'traza')).toHaveLength(1);
+    const traza = salida[iTraza];
+    expect(traza.generacion).toBe(7);
+    // Es la traza de la corrida 1 (semilla 3), la misma que con corridaAnimada, y el resultado sigue igual al de siempre.
+    expect(traza.tipo === 'traza' && traza.traza).toEqual(corridaAnimada(CASO_MIERCOLES, 3).traza);
+    const res = salida.find((r) => r.tipo === 'resultado');
+    expect(res && res.tipo === 'resultado' && res.comparacion).toEqual(comparar(CASO_MIERCOLES, correrVarias(CASO_MIERCOLES, 3, 3)));
+  });
+
+  it('si se cancela o hay error no llega traza', async () => {
+    const { salida, nucleo, hasta } = preparar();
+    nucleo.recibir({ tipo: 'simular', generacion: 1, entradas: CASO_MIERCOLES, semilla: 1, corridas: 50 });
+    await hasta((r) => r.tipo === 'progreso' && r.hechas >= 1);
+    nucleo.recibir({ tipo: 'cancelar', generacion: 1 });
+    await hasta((r) => r.tipo === 'cancelado');
+    nucleo.recibir({ tipo: 'simular', generacion: 2, entradas: { ...CASO_MIERCOLES, llegadasP1: -3 }, semilla: 1, corridas: 3 });
+    await hasta((r) => r.tipo === 'error');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(salida.some((r) => r.tipo === 'traza')).toBe(false);
   });
 });

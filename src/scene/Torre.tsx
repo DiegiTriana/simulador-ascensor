@@ -1,10 +1,10 @@
 // La torre de vidrio con el único ascensor: losas del vestíbulo, vidrio con su marco, la pared de puertas con una
 // puerta por piso, el indicador sobre cada puerta, los rótulos de los pisos y la cabina de cristal.
 
-import { useMemo } from 'react';
-import { ExtrudeGeometry, Shape, type CanvasTexture } from 'three';
-import type { EstadoEscena } from './estado.ts';
-import { lugarEnCabina } from './disposicion.ts';
+import { useThree } from '@react-three/fiber';
+import { useEffect, useMemo } from 'react';
+import { ExtrudeGeometry, MeshBasicMaterial, Shape } from 'three';
+import { useEscena } from '../store/escena.ts';
 import {
   CABINA,
   GROSOR_PARED_POZO,
@@ -16,14 +16,12 @@ import {
   Y_FONDO,
   Y_TECHO,
   etiquetaPiso,
-  pisoDeCabina,
   yPiso,
 } from './medidas.ts';
+import { claveIndicador, type Manejadores } from './manejadores.ts';
 import { PALETA } from './paleta.ts';
-import { Persona3D } from './Persona3D.tsx';
 import { Caja, CajasInstanciadas, Vidrio, type Instancia } from './piezas.tsx';
-import { useRotulo } from './rotulos.ts';
-import type { Vec3 } from './vistas.ts';
+import { crearRotulo, fuentesListas, useRotulo } from './rotulos.ts';
 
 const PISOS_CON_PUERTA = Array.from({ length: PISO_MAXIMO + 1 }, (_, i) => i);
 const PISOS_CON_LOSA = Array.from({ length: PISO_SIN_ACCESO + 1 }, (_, i) => i);
@@ -34,28 +32,72 @@ const HOJA = PUERTA.ancho / 2;
 /** Grosor de los marcos del vidrio. */
 const GROSOR_MARCO = 0.2;
 
-export function Torre({ cabina }: { cabina: EstadoEscena['cabina'] }) {
-  const enPiso = pisoDeCabina(cabina.piso);
-  const flecha = cabina.sentido;
-  const rotuloPiso = enPiso !== null ? etiquetaPiso(enPiso) : etiquetaPiso(Math.round(cabina.piso));
-  const textoIndicador = useRotulo(rotuloPiso, { fondo: PALETA.negro, tinta: PALETA.amarillo, ancho: 256, alto: 72, flecha });
+export function Torre({ manejadores }: { manejadores: Manejadores }) {
+  const material = useMemo(() => new MeshBasicMaterial({ toneMapped: false }), []);
+  useEffect(() => {
+    manejadores.materialIndicador = material;
+    return () => {
+      manejadores.materialIndicador = null;
+      material.dispose();
+    };
+  }, [manejadores, material]);
+  useTexturasIndicador(manejadores);
+  const exterior = useEscena((e) => e.vista === 'exterior');
   return (
     <group>
       <VidrioDeLaTorre />
       <Losas />
+      {exterior && <EntradasDelPasillo />}
       <ParedDePuertas />
       {PISOS_CON_PUERTA.map((piso) => (
         <group key={piso}>
-          <HojasDePuerta x={TORRE.xPuertas + 0.05} y={yPiso(piso)} abertura={piso === enPiso ? cabina.puertas : 0} color={PALETA.blancoSombra} />
-          <IndicadorSobrePuerta piso={piso} textura={textoIndicador} />
+          <HojasDePuerta manejadores={manejadores} piso={piso} />
+          <IndicadorSobrePuerta piso={piso} material={material} />
           <RotuloPiso piso={piso} />
         </group>
       ))}
       <Caja posicion={[CABINA.xCentro, Y_FONDO - 0.15, TORRE.zc]} tam={[4.1, 0.3, TORRE.ancho]} color={PALETA.pizarra} radio={0.05} />
-      <Cabina cabina={cabina} />
+      <Cabina manejadores={manejadores} />
       <RotuloSinAcceso />
     </group>
   );
+}
+
+/** Una textura por sentido y piso para el indicador; se crean cuando la fuente está lista. */
+function useTexturasIndicador(m: Manejadores) {
+  const invalidar = useThree((e) => e.invalidate);
+  useEffect(() => {
+    let vivo = true;
+    const hechas = new Map<string, ReturnType<typeof crearRotulo>>();
+    void fuentesListas().then(() => {
+      if (!vivo) return;
+      for (let piso = PISO_SOTANO; piso <= PISO_MAXIMO; piso++) {
+        for (const sentido of [-1, 0, 1] as const) {
+          hechas.set(
+            claveIndicador(piso, sentido),
+            crearRotulo(etiquetaPiso(piso), { fondo: PALETA.negro, tinta: PALETA.amarillo, ancho: 256, alto: 72, flecha: sentido }),
+          );
+        }
+      }
+      m.texturasIndicador = hechas;
+      m._claveIndicador = '';
+      invalidar();
+    });
+    return () => {
+      vivo = false;
+      m.texturasIndicador = null;
+      for (const t of hechas.values()) t.dispose();
+    };
+  }, [m, invalidar]);
+}
+
+/** El hueco por donde la gente entra al vestíbulo desde el pasillo: se ve desde afuera por el vidrio. */
+function EntradasDelPasillo() {
+  const entradas = useMemo<Instancia[]>(
+    () => PISOS_CON_PUERTA.map((piso) => ({ posicion: [TORRE.x0 + 0.03, yPiso(piso) + 1, TORRE.zc], tam: [0.06, 2, 2.4] })),
+    [],
+  );
+  return <CajasInstanciadas instancias={entradas} color={PALETA.pizarra} />;
 }
 
 /** Paneles de vidrio de frente, de atrás y de la derecha, con su marco de barras delgadas. */
@@ -144,39 +186,38 @@ function ParedDePuertas() {
   );
 }
 
-/** Las dos hojas de una puerta, que se corren hacia los lados detrás de las jambas. */
-function HojasDePuerta({ x, y, abertura, color }: { x: number; y: number; abertura: number; color: string }) {
-  const corrimiento = Math.min(1, Math.max(0, abertura)) * HOJA;
+/** Las dos hojas de la puerta de un piso; se corren hacia los lados detrás de las jambas (las mueve aplicarVista). */
+function HojasDePuerta({ manejadores, piso }: { manejadores: Manejadores; piso: number }) {
   return (
     <group>
-      {[-1, 1].map((lado) => (
+      {[-1, 1].map((lado, i) => (
         <Caja
           key={lado}
-          posicion={[x, y + PUERTA.alto / 2, TORRE.zc + lado * (HOJA / 2 + corrimiento)]}
+          posicion={[TORRE.xPuertas + 0.05, yPiso(piso) + PUERTA.alto / 2, TORRE.zc + lado * (HOJA / 2)]}
           tam={[0.07, PUERTA.alto - 0.02, HOJA - 0.02]}
-          color={color}
+          color={PALETA.blancoSombra}
           radio={0.025}
           sombra={false}
+          alMontar={(malla) => {
+            manejadores.hojasPiso[piso][i] = malla;
+          }}
         />
       ))}
     </group>
   );
 }
 
-/** Placa con el piso en que está la cabina, sobre la puerta de cada piso. */
-function IndicadorSobrePuerta({ piso, textura }: { piso: number; textura: CanvasTexture | null }) {
+/** Placa con el piso en que está la cabina, sobre la puerta de cada piso (todas comparten el mismo material). */
+function IndicadorSobrePuerta({ piso, material }: { piso: number; material: MeshBasicMaterial }) {
   if (piso === PISO_SIN_ACCESO) return null;
   const xPlaca = TORRE.xPuertas - GROSOR_PARED_POZO - 0.04;
   const y = yPiso(piso) + PUERTA.alto + 0.28;
   return (
     <group>
       <Caja posicion={[xPlaca, y, TORRE.zc]} tam={[0.08, 0.4, 1.4]} color={PALETA.negro} radio={0.03} sombra={false} />
-      {textura && (
-        <mesh position={[xPlaca - 0.045, y, TORRE.zc]} rotation={[0, -Math.PI / 2, 0]}>
-          <planeGeometry args={[1.32, 0.37]} />
-          <meshBasicMaterial map={textura} toneMapped={false} />
-        </mesh>
-      )}
+      <mesh position={[xPlaca - 0.045, y, TORRE.zc]} rotation={[0, -Math.PI / 2, 0]} material={material}>
+        <planeGeometry args={[1.32, 0.37]} />
+      </mesh>
     </group>
   );
 }
@@ -212,20 +253,19 @@ function RotuloSinAcceso() {
   );
 }
 
-/** Cabina de cristal con las personas que lleva. Su origen es el centro de su piso. */
-function Cabina({ cabina }: { cabina: EstadoEscena['cabina'] }) {
+/** Cabina de cristal. Su origen es el centro de su piso; aplicarVista la sube y baja y mueve sus puertas. */
+function Cabina({ manejadores }: { manejadores: Manejadores }) {
   const { fondo, ancho, alto, pared } = CABINA;
-  const y = yPiso(cabina.piso) + 0.02;
   const xFrente = -(fondo / 2 + pared / 2);
   const xFondo = fondo / 2 + pared / 2;
   const zLado = ancho / 2 + pared / 2;
-  const posiciones = useMemo<Vec3[]>(
-    () => cabina.ocupantes.slice(0, 10).map((_, i) => [lugarEnCabina(i).x, 0, lugarEnCabina(i).z]),
-    [cabina.ocupantes],
-  );
-  const corrimiento = Math.min(1, Math.max(0, cabina.puertas)) * HOJA;
   return (
-    <group position={[CABINA.xCentro, y, TORRE.zc]}>
+    <group
+      position={[CABINA.xCentro, yPiso(1) + 0.02, TORRE.zc]}
+      ref={(g) => {
+        manejadores.cabina = g;
+      }}
+    >
       <Caja posicion={[0, -0.05, 0]} tam={[fondo + 2 * pared, 0.1, ancho + 2 * pared]} color={PALETA.gris} radio={0.04} />
       <Caja posicion={[0, alto + 0.05, 0]} tam={[fondo + 2 * pared, 0.1, ancho + 2 * pared]} color={PALETA.crema} radio={0.04} sombra={false} />
       {/* Postes de las esquinas. */}
@@ -248,7 +288,7 @@ function Cabina({ cabina }: { cabina: EstadoEscena['cabina'] }) {
       {/* Pasamanos al fondo. */}
       <Caja posicion={[fondo / 2 - 0.08, 0.85, 0]} tam={[0.06, 0.06, ancho - 0.3]} color={PALETA.gris} radio={0.025} sombra={false} />
       {/* Frente: dos jambas y las dos hojas de la puerta de la cabina. */}
-      {[-1, 1].map((lado) => (
+      {[-1, 1].map((lado, i) => (
         <group key={lado}>
           <Caja
             posicion={[xFrente, alto / 2, lado * (PUERTA.ancho / 2 + (ancho / 2 - PUERTA.ancho / 2) / 2)]}
@@ -257,16 +297,16 @@ function Cabina({ cabina }: { cabina: EstadoEscena['cabina'] }) {
             radio={0.03}
           />
           <Caja
-            posicion={[xFrente + pared * 0.9, alto / 2, lado * (HOJA / 2 + corrimiento)]}
+            posicion={[xFrente + pared * 0.9, alto / 2, lado * (HOJA / 2)]}
             tam={[0.07, alto - 0.04, HOJA - 0.02]}
             color={PALETA.blancoSombra}
             radio={0.025}
             sombra={false}
+            alMontar={(malla) => {
+              manejadores.hojasCabina[i] = malla;
+            }}
           />
         </group>
-      ))}
-      {cabina.ocupantes.slice(0, 10).map((p, i) => (
-        <Persona3D key={p.id} id={p.id} tipo={p.tipo} posicion={posiciones[i]} giro={lugarEnCabina(i).giro} />
       ))}
     </group>
   );
