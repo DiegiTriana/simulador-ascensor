@@ -5,6 +5,7 @@ import { Lamparas } from './Lamparas.tsx';
 import { plantillaDe, textoEstado } from './estado.ts';
 import { coma, punto } from './formato.ts';
 import { indicadoresDe } from './tabla.ts';
+import { useValidacion } from './validacionUi.ts';
 
 const pctTexto = (n: number) => (n >= 99.95 ? '100' : punto(n, 1));
 
@@ -14,9 +15,14 @@ export function Tira() {
   const progreso = useApp((s) => s.progreso);
   const resultado = useApp((s) => s.resultado);
   const mensajeError = useApp((s) => s.mensajeError);
+  const intento = useApp((s) => s.intento);
+  const v = useValidacion();
 
   const ind = useMemo(() => (resultado ? indicadoresDe(resultado.entradas, resultado.comparacion) : null), [resultado]);
-  const texto = textoEstado(fase, progreso, mensajeError, false);
+  // Esta es la zona que se anuncia con aria-live: también dice cuándo hay campos por corregir.
+  const porCorregir = intento && !v.ok;
+  const sinResultados = fase === 'inactivo' && !resultado && !porCorregir;
+  const texto = sinResultados ? 'Aún no hay resultados. Pulsa Simular.' : textoEstado(fase, progreso, mensajeError, porCorregir);
   const error = fase === 'error';
 
   const sim = ind?.simulacion != null ? pctTexto(ind.simulacion) : undefined;

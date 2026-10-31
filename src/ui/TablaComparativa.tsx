@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useApp } from '../store/app.ts';
+import { ConSubindice } from './Subindice.tsx';
 import { construirTabla, filasVacias, type Celda } from './tabla.ts';
 
 function Valor({ celda }: { celda: Celda | null }) {
@@ -36,7 +37,7 @@ export function TablaComparativa() {
     <div className="tabla-zona">
       {!tabla && (
         <p className="frase frase-vacia">
-          Todavía no hay resultados. Carga el caso del miércoles o escribe los datos, y pulsa Simular.
+          Las filas se llenan al simular. Para probar rápido, carga el caso del miércoles.
         </p>
       )}
       {tabla?.frase && <p className="frase">{tabla.frase}</p>}
@@ -101,7 +102,11 @@ function FilaTabla({ f }: { f: ReturnType<typeof filasVacias>[number] }) {
     <tr role="row" className={f.destacada ? 'fila-destacada' : undefined}>
       <th scope="row" role="rowheader">
         {f.etiqueta}
-        {f.detalle && <span className="detalle">{f.detalle}</span>}
+        {f.detalle && (
+          <span className="detalle">
+            <ConSubindice texto={f.detalle} />
+          </span>
+        )}
       </th>
       <td role="cell" data-label="Fórmulas, toda la franja">
         <Valor celda={f.franja} />

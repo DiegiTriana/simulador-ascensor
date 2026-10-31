@@ -125,7 +125,8 @@ export function construirTabla(entradas: Entradas, c: Comparacion): TablaModelo 
       ...ET['lambda'],
       franja: de(F, (m) => m.lambda, 2),
       picos: de(P, (m) => m.lambda, 2),
-      sim: conPicos(num(lambdaFranja, 2), cel(c.sim.lambdaPicoPorMin, 2)),
+      // λ es un dato de entrada (sale de las personas y de la forma de los picos), no una medida: sin ±.
+      sim: conPicos(num(lambdaFranja, 2), num(c.sim.lambdaPicoPorMin?.media, 2)),
     },
     {
       ...ET['mu'],

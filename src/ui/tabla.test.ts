@@ -38,6 +38,13 @@ describe('tabla comparativa', () => {
     expect(t.frase).toContain('Las fórmulas se quedan cortas.');
   });
 
+  it('λ de los picos en la simulación no lleva ± (es un dato de entrada)', () => {
+    const lambda = t.filas.find((f) => f.id === 'lambda');
+    expect(lambda?.sim?.pm).toBeUndefined();
+    expect(lambda?.sim?.picos?.valor).toBe('3,68');
+    expect(lambda?.sim?.picos?.pm).toBeUndefined();
+  });
+
   it('el indicador principal compara los picos y trae el real del miércoles', () => {
     const i = indicadoresDe(CASO_MIERCOLES, cMiercoles);
     expect(i.base).toBe('picos');

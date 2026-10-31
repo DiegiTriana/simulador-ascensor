@@ -7,6 +7,8 @@ export function textoEstado(
   mensajeError: string | null,
   hayCamposPorCorregir: boolean,
 ): string {
+  // Corregir los campos pasa por delante de cualquier otro estado, salvo mientras corre la simulación.
+  if (hayCamposPorCorregir && fase !== 'simulando') return 'Revisa los campos marcados.';
   switch (fase) {
     case 'simulando':
       return `Simulando, ${progreso?.hechas ?? 0} de ${progreso?.total ?? 10}`;
@@ -17,7 +19,7 @@ export function textoEstado(
     case 'error':
       return `No se pudo simular: ${mensajeError ?? 'error desconocido'}. Pulsa Simular para intentarlo otra vez.`;
     default:
-      return hayCamposPorCorregir ? 'Revisa los campos marcados.' : '';
+      return '';
   }
 }
 

@@ -426,14 +426,14 @@ dd {
   outline-offset: 2px;
 }
 .boton-llamada {
-  width: 66px;
-  height: 66px;
+  width: 74px;
+  height: 74px;
   padding: 0;
   background: var(--acero);
   color: var(--grafito);
   border: 3px solid var(--tinta);
   border-radius: 50%;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
@@ -663,6 +663,10 @@ dd {
 .tabla thead th:first-child {
   text-align: left;
 }
+sub {
+  font-size: 0.75em;
+  line-height: 0;
+}
 .tabla .sub,
 .tabla .detalle {
   display: block;
@@ -803,8 +807,8 @@ dd {
     order: 2;
   }
   .boton-llamada {
-    width: 58px;
-    height: 58px;
+    width: 66px;
+    height: 66px;
     font-size: 0.8125rem;
   }
   .aro {

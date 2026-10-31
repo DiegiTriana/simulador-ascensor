@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { RANGOS } from '../data/rangos.ts';
+import { ConSubindice } from './Subindice.tsx';
 import { filasVacias } from './tabla.ts';
 
 interface Props {
@@ -74,7 +75,7 @@ export function Ayuda({ abierta, alCerrar }: Props) {
             {filas.map((f) => (
               <div key={f.id}>
                 <dt>{f.etiqueta}</dt>
-                <dd>{f.detalle}</dd>
+                <dd>{f.detalle && <ConSubindice texto={f.detalle} />}</dd>
               </div>
             ))}
           </dl>
@@ -86,7 +87,7 @@ export function Ayuda({ abierta, alCerrar }: Props) {
         <section>
           <h3>¿Por qué las fórmulas dan menos personas que se van por las escaleras que lo que pasó de verdad?</h3>
           <p>
-            El modelo de la clase supone que una persona se va solo cuando el sistema está lleno (10 en la cabina y 1 esperando). En el edificio, el ascensor atiende por tandas: sube hasta 10 personas y a quien no cabe en la cabina se le acaba la espera y 85 de cada 100 se van por las escaleras, aunque la fila sea corta. Por eso, con las mismas llegadas, las fórmulas dan alrededor de 4 a 6 % si se usa la capacidad que dice el documento (3,9 personas por minuto) y entre 10 y 13 % si se usa la que mide la simulación (entre 3,4 y 3,5 por minuto), mientras que la simulación da cerca de 20 %, igual que el 20,6 % que se contó en la hora pico del miércoles. En ambos casos las fórmulas se quedan cortas.
+            El modelo de la clase supone que una persona se va solo cuando el sistema está lleno (10 en la cabina y 1 esperando). En el edificio, el ascensor atiende por tandas: sube hasta 10 personas y a quien no cabe en la cabina se le acaba la espera y 85 de cada 100 se van por las escaleras, aunque la fila sea corta. Por eso, con las mismas llegadas, las fórmulas dan alrededor de 4 a 6 % si se usa la capacidad que dice el documento (3,9 personas por minuto) y entre 10 y 13 % si se usa la que mide la simulación (unas 3,5 por minuto en promedio de muchas corridas; con solo 10 corridas puede salir entre 3,3 y 3,6), mientras que la simulación da cerca de 20 %, igual que el 20,6 % que se contó en la hora pico del miércoles. En ambos casos las fórmulas se quedan cortas.
           </p>
         </section>
 
@@ -100,7 +101,7 @@ export function Ayuda({ abierta, alCerrar }: Props) {
         <section>
           <h3>Nota sobre μ: 3,9 del documento y la que mide la simulación</h3>
           <p>
-            El documento da μ = 3,9 personas por minuto. Esta página usa la μ que mide la simulación, como pide el plan: las personas que suben por minuto en las vueltas con fila llena. En el caso del miércoles sale entre 3,4 y 3,5. La diferencia viene de la duración de la vuelta: en la simulación dura unos 165 segundos en promedio (entre 121 y 222), mientras que las vueltas medidas en el edificio duran unos 153 (entre 120 y 195). Con 10 personas por vuelta, 153 segundos dan 3,9 por minuto y 165 dan unas 3,6. Además, algunas vueltas suben menos de 10 porque entra una silla de ruedas o porque el cupo se ocupa con quienes bajan, y por eso la medida queda entre 3,4 y 3,5.
+            El documento da μ = 3,9 personas por minuto. Esta página usa la μ que mide la simulación, como pide el plan: las personas que suben por minuto en las vueltas con fila llena. En el caso del miércoles sale cerca de 3,5 en promedio de muchas corridas; con solo 10 corridas puede salir entre 3,3 y 3,6, y esa es la cifra que muestra la tabla. La diferencia viene de la duración de la vuelta: en la simulación dura unos 165 segundos en promedio (entre 121 y 222), mientras que las vueltas medidas en el edificio duran unos 153 (entre 120 y 195). Con 10 personas por vuelta, 153 segundos dan 3,9 por minuto y 165 dan unas 3,6. Además, algunas vueltas suben menos de 10 porque entra una silla de ruedas o porque el cupo se ocupa con quienes bajan, y por eso la medida queda cerca de 3,5.
           </p>
           <p>
             La simulación carga a las personas de una en una, y en el edificio suelen llegar en grupos que van al mismo piso; eso probablemente alarga la vuelta simulada. Además, la comprobación con el miércoles se hizo con un solo día de hora pico, así que es una guía y no una prueba definitiva.
