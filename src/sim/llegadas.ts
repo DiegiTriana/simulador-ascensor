@@ -2,6 +2,7 @@
 
 import { PARAMETROS as P } from '../data/parametros.ts';
 import { cambiosEnFranja } from '../data/horario.ts';
+import { FORMA_PICO_ANTES, FORMA_PICO_DESPUES } from '../data/formaPicos.ts';
 import { barajar, crearRng, elegirPonderado, type Rng } from './rng.ts';
 import type { Entradas, Escenario, Persona, TipoPersona } from './tipos.ts';
 
@@ -39,6 +40,50 @@ function complemento(ventanas: Ventana[], T: number): Ventana[] {
   }
   if (cursor < T) res.push([cursor, T]);
   return res;
+}
+
+interface Segmento {
+  a: number;
+  b: number;
+  /** Parte de las llegadas de picos que le toca (un pico completo vale 1). */
+  peso: number;
+}
+
+/**
+ * Tramos de los picos dentro de la franja. Cada cambio de clase tiene un pico antes (forma del pico 2
+ * del miércoles) y otro después (forma del pico 1), de 12,5 min; lo que sale de la franja se recorta
+ * y su peso baja en proporción.
+ */
+function segmentosDePico(cambios: number[], T: number): Segmento[] {
+  const W = P.picoSegundos;
+  const res: Segmento[] = [];
+  for (const o of cambios) {
+    for (const [inicio, forma] of [[o - W, FORMA_PICO_ANTES], [o, FORMA_PICO_DESPUES]] as const) {
+      for (const tr of forma) {
+        const a = Math.max(0, inicio + tr.desde * W);
+        const b = Math.min(T, inicio + tr.hasta * W);
+        if (b <= a) continue;
+        res.push({ a, b, peso: (tr.proporcion * (b - a)) / ((tr.hasta - tr.desde) * W) });
+      }
+    }
+  }
+  return res;
+}
+
+/** Reparte `total` en enteros proporcionales a `pesos` (mayor resto). */
+export function repartir(total: number, pesos: number[]): number[] {
+  const suma = pesos.reduce((s, p) => s + p, 0);
+  if (suma <= 0) return pesos.map(() => 0);
+  const exactos = pesos.map((p) => (total * p) / suma);
+  const base = exactos.map(Math.floor);
+  let faltan = total - base.reduce((s, x) => s + x, 0);
+  const orden = exactos.map((x, i) => [x - Math.floor(x), i] as const).sort((p, q) => q[0] - p[0] || p[1] - q[1]);
+  for (const [, i] of orden) {
+    if (faltan <= 0) break;
+    base[i]++;
+    faltan--;
+  }
+  return base;
 }
 
 const largo = (vs: Ventana[]) => vs.reduce((s, [a, b]) => s + (b - a), 0);
@@ -89,7 +134,11 @@ export function generarEscenario(entradas: Entradas, semilla: number, opciones: 
   else if (largo(valle) === 0) enPicos = resto;
   else enPicos = Math.round(resto * P.fraccionEnPicos);
   const tiempos: number[] = [];
-  for (let i = 0; i < enPicos; i++) tiempos.push(muestrear(rng, picos, T));
+  const segmentos = segmentosDePico(cambios, T);
+  const porSegmento = repartir(enPicos, segmentos.map((s) => s.peso));
+  segmentos.forEach((s, k) => {
+    for (let i = 0; i < porSegmento[k]; i++) tiempos.push(muestrear(rng, [[s.a, s.b]], T));
+  });
   const ventanasValle = largo(valle) > 0 ? valle : todo;
   for (let i = enPicos; i < resto; i++) tiempos.push(muestrear(rng, ventanasValle, T));
   tiempos.sort((a, b) => a - b);

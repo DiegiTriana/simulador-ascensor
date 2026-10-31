@@ -20,13 +20,14 @@ const sinEscaleras = { ...CONFIG_DEFECTO, probEscaleras: 0 };
 const todasEscaleras = { ...CONFIG_DEFECTO, probEscaleras: 1 };
 
 describe('simulación con casos pequeños hechos a mano', () => {
-  it('una persona de P1 a P4: abre 3,3 s, sube a los 3,3 s y baja a los 32,2 s', () => {
-    // abrir 3,3 + puertas abiertas 6,3 + cerrar 4,3 + 3 pisos × 5 s + abrir 3,3 = 32,2
+  it('una persona de P1 a P4: abre 3,3 s, sube a los 3,3 s y baja a los 28,9 s', () => {
+    // 6,3 s con puertas abiertas contados desde que empiezan a abrir (3,3 abrir + 3,0 más) + cerrar 4,3
+    // + 3 pisos × 5 s + abrir 3,3 = 3,3 + 3,0 + 4,3 + 15 + 3,3 = 28,9
     const r = simular(escenario([persona(0, 0, 4)]), 1);
     const [v] = r.vueltas;
     expect(v.t).toBeCloseTo(3.3, 5);
     expect(r.Wq).toBeCloseTo(3.3, 5);
-    expect(r.W).toBeCloseTo(32.2, 5);
+    expect(r.W).toBeCloseTo(28.9, 5);
     expect(r.abandonos).toBe(0);
   });
 
@@ -185,9 +186,48 @@ describe('validación con el caso del miércoles', () => {
     expect(m).toBeLessThan(30);
   });
 
-  // PENDIENTE (fase 1): el objetivo es ≈ 20 % (real 20,6 %). El modelo literal da ≈ 16 % (ver docs/plan.md).
-  // Cuando se decida cómo cerrar la brecha, este caso debe pasar y quitarse el `.fails`.
-  it.fails('abandono en picos dentro de ±3 puntos del 20,6 % real', () => {
+  it('abandono en picos dentro de ±3 puntos del 20,6 % real', () => {
     expect(Math.abs(c.sim.abandonoPicoPct!.media - 20.6)).toBeLessThan(3);
+  });
+
+  it('la vuelta saturada dura lo que las reales: media entre 130 y 180 s', () => {
+    const duraciones = corridas.flatMap((r) =>
+      r.vueltas.filter((v) => !v.aseo && v.quedanAfuera > 0 && v.duracion !== null).map((v) => v.duracion as number),
+    );
+    const media = duraciones.reduce((s, x) => s + x, 0) / duraciones.length;
+    expect(media).toBeGreaterThan(130);
+    expect(media).toBeLessThan(180);
+  });
+});
+
+describe('forma de las llegadas dentro de los picos', () => {
+  const cuentaEntre = (e: Escenario, a: number, b: number) =>
+    e.personas.filter((p) => p.origen === 1 && !p.inicial && p.llegada >= a && p.llegada < b).length;
+
+  it('el miércoles: 92 personas en picos, 46 en cada uno, con las llegadas por tramo de los datos', () => {
+    const e = generarEscenario(CASO_MIERCOLES, 4);
+    const escala = 750 / 760; // los tramos del pico 1 suman 760 s y el pico dura 750 s
+    // Pico 1: 15, 13, 11 y 7 personas
+    const cortes1 = [0, 120, 245, 490, 760].map((x) => x * escala);
+    expect([0, 1, 2, 3].map((k) => cuentaEntre(e, cortes1[k], cortes1[k + 1]))).toEqual([15, 13, 11, 7]);
+    // Pico 2: 12, 13, 14 y 7 personas (los tramos suman justo 750 s)
+    const cortes2 = [0, 230, 365, 560, 750].map((x) => 2250 + x);
+    expect([0, 1, 2, 3].map((k) => cuentaEntre(e, cortes2[k], cortes2[k + 1]))).toEqual([12, 13, 14, 7]);
+  });
+
+  it('escala al total de cada pico según las entradas', () => {
+    // 215 llegadas: 27 ya esperan (15/119 escalado), quedan 188 y el 88 % (165) va a los picos
+    const e = generarEscenario({ ...CASO_MIERCOLES, llegadasP1: 215 }, 4);
+    const p1 = cuentaEntre(e, 0, 750);
+    const p2 = cuentaEntre(e, 2250, 3000);
+    expect(p1 + p2).toBe(165);
+    expect(Math.abs(p1 - p2)).toBeLessThanOrEqual(1);
+  });
+
+  it('si la franja corta un pico, solo queda la parte de la forma que cae dentro', () => {
+    // 12:50 a 13:30: el pico 1 ya empezó hace 10 min y solo quedan 2,5 min de su cola
+    const e = generarEscenario({ ...CASO_MIERCOLES, horaInicioMin: 12 * 60 + 50, duracionMin: 40, llegadasP1: 60 }, 4);
+    const enPico = e.personas.filter((p) => p.origen === 1 && p.enPico).length;
+    expect(enPico).toBe(Math.round(60 * 0.88));
   });
 });

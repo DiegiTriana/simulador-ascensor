@@ -208,7 +208,8 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
         registrarVuelta(vueltaActual);
       }
     }
-    timer = Math.max(cfg.dsMinAbierta, cfg.dsPorPersona * movimientos);
+    // Los 6,3 s mínimos se cuentan desde que empiezan a abrir (ya pasaron los 3,3 s de abrir).
+    timer = Math.max(cfg.dsMinAbierta - cfg.dsAbrir, cfg.dsPorPersona * movimientos);
     modo = 'abierto';
   }
 
