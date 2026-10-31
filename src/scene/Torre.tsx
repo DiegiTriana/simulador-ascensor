@@ -31,6 +31,8 @@ const ALTO_TORRE = Y_TECHO - Y_FONDO;
 const Y_MEDIO = (Y_TECHO + Y_FONDO) / 2;
 /** Cada hoja de puerta mide la mitad del hueco y, al abrir, se corre esto detrás de la jamba. */
 const HOJA = PUERTA.ancho / 2;
+/** Grosor de los marcos del vidrio. */
+const GROSOR_MARCO = 0.2;
 
 export function Torre({ cabina }: { cabina: EstadoEscena['cabina'] }) {
   const enPiso = pisoDeCabina(cabina.piso);
@@ -62,21 +64,22 @@ function VidrioDeLaTorre() {
     const barras: Instancia[] = [];
     const xs = [TORRE.x0, TORRE.xPuertas, TORRE.x1];
     const zs = [TORRE.z0, TORRE.zc, TORRE.z1];
+    const g = GROSOR_MARCO;
     for (const piso of PISOS_CON_LOSA) {
       const y = yPiso(piso);
       barras.push(
-        { posicion: [4, y, TORRE.z1], tam: [8.1, 0.08, 0.08] },
-        { posicion: [4, y, TORRE.z0], tam: [8.1, 0.08, 0.08] },
-        { posicion: [TORRE.x1, y, TORRE.zc], tam: [0.08, 0.08, TORRE.ancho + 0.1] },
+        { posicion: [4, y, TORRE.z1], tam: [8 + g, g, g] },
+        { posicion: [4, y, TORRE.z0], tam: [8 + g, g, g] },
+        { posicion: [TORRE.x1, y, TORRE.zc], tam: [g, g, TORRE.ancho + g] },
       );
     }
     for (const x of xs) {
       barras.push(
-        { posicion: [x, Y_MEDIO, TORRE.z1], tam: [0.08, ALTO_TORRE, 0.08] },
-        { posicion: [x, Y_MEDIO, TORRE.z0], tam: [0.08, ALTO_TORRE, 0.08] },
+        { posicion: [x, Y_MEDIO, TORRE.z1], tam: [g, ALTO_TORRE, g] },
+        { posicion: [x, Y_MEDIO, TORRE.z0], tam: [g, ALTO_TORRE, g] },
       );
     }
-    for (const z of zs) barras.push({ posicion: [TORRE.x1, Y_MEDIO, z], tam: [0.08, ALTO_TORRE, 0.08] });
+    for (const z of zs) barras.push({ posicion: [TORRE.x1, Y_MEDIO, z], tam: [g, ALTO_TORRE, g] });
     return { barras };
   }, []);
   return (
@@ -84,7 +87,7 @@ function VidrioDeLaTorre() {
       <Vidrio posicion={[4, Y_MEDIO, TORRE.z1]} tam={[TORRE.x1 - TORRE.x0, ALTO_TORRE]} />
       <Vidrio posicion={[4, Y_MEDIO, TORRE.z0]} tam={[TORRE.x1 - TORRE.x0, ALTO_TORRE]} />
       <Vidrio posicion={[TORRE.x1, Y_MEDIO, TORRE.zc]} tam={[TORRE.ancho, ALTO_TORRE]} rotacionY={Math.PI / 2} />
-      <CajasInstanciadas instancias={barras} color={PALETA.pizarra} />
+      <CajasInstanciadas instancias={barras} color={PALETA.gris} />
       {/* Tapa de la torre. */}
       <Caja posicion={[4, Y_TECHO + 0.15, TORRE.zc]} tam={[8.4, 0.3, TORRE.ancho + 0.4]} color={PALETA.crema} radio={0.1} />
     </group>
@@ -197,7 +200,7 @@ function RotuloPiso({ piso }: { piso: number }) {
 
 /** El letrero de P10: el ascensor no llega a ese piso. */
 function RotuloSinAcceso() {
-  const textura = useRotulo('P10 · sin acceso', { fondo: PALETA.rojo, tinta: PALETA.blanco, ancho: 640, alto: 112 });
+  const textura = useRotulo('P10, sin acceso', { fondo: PALETA.rojo, tinta: PALETA.blanco, ancho: 640, alto: 112 });
   if (!textura) return null;
   return (
     <group position={[4, yPiso(PISO_SIN_ACCESO) + 1.35, TORRE.z1 + 0.04]}>

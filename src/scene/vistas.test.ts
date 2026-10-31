@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { BLOQUE, PASILLO, TORRE, Y_FONDO, Y_TECHO, yPiso } from './medidas.ts';
-import { limitesExterior, poseDe, poseExterior, posePiso, type Pose, type Vec3 } from './vistas.ts';
+import {
+  BLOQUE,
+  DECORACION,
+  PARED_DERECHA_Z,
+  PARED_IZQUIERDA_Z,
+  PASILLO,
+  TORRE,
+  Y_FONDO,
+  Y_TECHO,
+  yPiso,
+} from './medidas.ts';
+import { limitesExterior, poseDe, poseExterior, poseFila, posePiso, type Pose, type Vec3 } from './vistas.ts';
 
 const ASPECTOS = [0.7, 1, 1.39, 1.6, 2.4];
 
@@ -100,8 +110,90 @@ describe('vista desde un piso', () => {
     expect(b - a).toBeCloseTo(yPiso(9) - yPiso(1));
   });
 
+  it('los letreros, la puerta de las escaleras y la banca se ven completos, sea cual sea la forma del lienzo', () => {
+    const { escaleras: e, numero: n, banca: b } = DECORACION;
+    // Cada pieza como una caja: x desde–hasta, y desde–hasta y la pared en que está.
+    const piezas: { nombre: string; x: [number, number]; y: [number, number]; z: number }[] = [
+      { nombre: 'puerta de las escaleras', x: [e.x - e.ancho / 2, e.x + e.ancho / 2], y: [0, e.alto], z: PARED_IZQUIERDA_Z },
+      {
+        nombre: 'letrero de las escaleras',
+        x: [e.x - e.ancho / 2, e.x + e.ancho / 2],
+        y: [e.letreroY - e.letreroAlto / 2, e.letreroY + e.letreroAlto / 2],
+        z: PARED_IZQUIERDA_Z,
+      },
+      {
+        nombre: 'número del piso',
+        x: [n.x - n.lado / 2, n.x + n.lado / 2],
+        y: [n.y - n.lado / 2, n.y + n.lado / 2],
+        z: PARED_DERECHA_Z,
+      },
+      { nombre: 'banca', x: [b.x - b.ancho / 2, b.x + b.ancho / 2], y: [0, b.alto], z: PARED_DERECHA_Z },
+    ];
+    for (const aspecto of [0.8, 1, 1.2, 1.39, 1.6, 2, 2.4]) {
+      for (const piso of [1, 9]) {
+        const pose = posePiso(piso, aspecto);
+        for (const pieza of piezas) {
+          for (const x of pieza.x) {
+            for (const y of pieza.y) {
+              const p = proyectar(pose, aspecto, [x, yPiso(piso) + y, pieza.z]);
+              expect(p.delante, `${pieza.nombre} detrás de la cámara (aspecto ${aspecto})`).toBe(true);
+              expect(Math.abs(p.x), `${pieza.nombre} cortada a los lados (aspecto ${aspecto})`).toBeLessThan(1);
+              expect(Math.abs(p.y), `${pieza.nombre} cortada arriba o abajo (aspecto ${aspecto})`).toBeLessThan(1);
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('el campo de visión solo se abre cuando el lienzo es angosto, y nunca pasa de 75°', () => {
+    expect(posePiso(1, 1.6).fov).toBe(40);
+    expect(posePiso(1, 1).fov).toBeGreaterThan(40);
+    for (const aspecto of [0.8, 1, 1.4, 2.4]) expect(posePiso(1, aspecto).fov).toBeLessThanOrEqual(75);
+  });
+
   it('poseDe elige la pose de la vista pedida', () => {
     expect(poseDe('exterior', 4, 1.4)).toEqual(poseExterior(1.4));
+    expect(poseDe('exterior', 4, 1.4, 'todo')).toEqual(poseExterior(1.4));
+    expect(poseDe('exterior', 4, 1.4, 'fila')).toEqual(poseFila(1.4));
     expect(poseDe('piso', 4, 1.4)).toEqual(posePiso(4, 1.4));
+    expect(poseDe('piso', 4, 1.4, 'fila')).toEqual(posePiso(4, 1.4));
+  });
+});
+
+describe('encuadre «Ver la fila»', () => {
+  it('muestra completo el pie de la torre: P1 con su vestíbulo, el pozo y la cabina, en cualquier lienzo', () => {
+    for (const aspecto of [0.8, 1, 1.39, 1.6, 2.4]) {
+      const pose = poseFila(aspecto);
+      for (const x of [TORRE.x0, TORRE.x1]) {
+        for (const y of [yPiso(1), yPiso(1) + 2.6]) {
+          for (const z of [TORRE.z0, TORRE.z1]) {
+            const p = proyectar(pose, aspecto, [x, y, z]);
+            expect(p.delante).toBe(true);
+            expect(Math.abs(p.x), `aspecto ${aspecto}`).toBeLessThanOrEqual(1);
+            expect(Math.abs(p.y), `aspecto ${aspecto}`).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    }
+  });
+
+  it('queda mucho más cerca que la vista de todo el edificio y dentro de los límites de la cámara', () => {
+    for (const aspecto of [1, 1.39, 2]) {
+      const fila = poseFila(aspecto);
+      const todo = poseExterior(aspecto);
+      const dist = (p: Pose) => Math.hypot(...p.posicion.map((v, i) => v - p.objetivo[i]));
+      expect(dist(fila)).toBeLessThan(dist(todo) / 3);
+      const l = limitesExterior(aspecto);
+      expect(dist(fila)).toBeGreaterThan(l.distanciaMin);
+      expect(dist(fila)).toBeLessThanOrEqual(l.distanciaMax);
+      const acimut = Math.atan2(fila.posicion[0] - fila.objetivo[0], fila.posicion[2] - fila.objetivo[2]);
+      expect(acimut).toBeGreaterThan(l.azimutMin);
+      expect(acimut).toBeLessThan(l.azimutMax);
+      for (let i = 0; i < 3; i++) {
+        expect(fila.objetivo[i]).toBeGreaterThanOrEqual(l.objetivoMin[i]);
+        expect(fila.objetivo[i]).toBeLessThanOrEqual(l.objetivoMax[i]);
+      }
+    }
   });
 });

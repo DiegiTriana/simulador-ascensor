@@ -289,7 +289,8 @@ sub {
   opacity: 0.45;
   cursor: default;
 }
-.segmentos {
+.segmentos,
+.encuadres {
   display: flex;
   gap: 6px;
 }

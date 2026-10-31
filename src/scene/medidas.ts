@@ -40,7 +40,21 @@ export const CABINA = {
 } as const;
 
 /** Pasillo del piso, a la izquierda del vestíbulo (solo se dibuja en la vista desde un piso). */
-export const PASILLO = { x0: -7, x1: 0 } as const;
+export const PASILLO = { x0: -8, x1: 0 } as const;
+/** Cara interior de cada pared lateral del pasillo. */
+export const PARED_IZQUIERDA_Z = TORRE.z0;
+export const PARED_DERECHA_Z = TORRE.z1 - 0.02;
+
+/**
+ * Lo que se cuelga en las paredes del pasillo. Desde el fondo del pasillo solo se ven los últimos metros de cada
+ * pared, así que va ahí; la cámara de la vista desde un piso se calcula para que todo esto se vea completo.
+ */
+export const DECORACION = {
+  escaleras: { x: -0.95, ancho: 1, alto: 1.9, letreroY: 2.1, letreroAlto: 0.275 },
+  numero: { x: -0.8, lado: 0.7, y: 1.6 },
+  banca: { x: -0.8, ancho: 1, alto: 0.5, fondo: 0.45 },
+  maceta: { x: -0.3 },
+} as const;
 
 /** La cabina solo está «en» un piso si queda a menos de esto del piso (en pisos). */
 export const TOLERANCIA_PISO = 0.02;

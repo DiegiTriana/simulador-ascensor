@@ -40,7 +40,8 @@ interface Props {
 export default function Escena3D({ alPerderContexto }: Props) {
   const vista = useEscena((s) => s.vista);
   const piso = useEscena((s) => s.piso);
-  const restablecer = useEscena((s) => s.restablecer);
+  const encuadre = useEscena((s) => s.encuadre);
+  const orden = useEscena((s) => s.orden);
   const sinMovimiento = useSinMovimiento();
   const estado = useMemo<EstadoEscena>(
     () => (import.meta.env.DEV ? estadoDePruebaConParametros(window.location.search) : estadoDePrueba()),
@@ -67,7 +68,7 @@ export default function Escena3D({ alPerderContexto }: Props) {
       <Torre cabina={estado.cabina} />
       <Filas filas={estado.filas} />
       {vista === 'piso' && <Pasillo piso={piso} />}
-      <Camara vista={vista} piso={piso} restablecer={restablecer} sinMovimiento={sinMovimiento} />
+      <Camara vista={vista} piso={piso} encuadre={encuadre} orden={orden} sinMovimiento={sinMovimiento} />
     </Canvas>
   );
 }

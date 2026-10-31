@@ -1,7 +1,17 @@
 // Poses de cámara de las dos vistas de esta parte: exterior y desde un piso. Son funciones puras del tamaño
 // del lienzo y del piso, para que se puedan probar sin dibujar nada.
 
-import { BLOQUE, PASILLO, TORRE, Y_FONDO, Y_TECHO, yPiso } from './medidas.ts';
+import {
+  BLOQUE,
+  DECORACION,
+  PARED_DERECHA_Z,
+  PARED_IZQUIERDA_Z,
+  PASILLO,
+  TORRE,
+  Y_FONDO,
+  Y_TECHO,
+  yPiso,
+} from './medidas.ts';
 
 export type Vista = 'exterior' | 'piso';
 export type Vec3 = [number, number, number];
@@ -43,26 +53,66 @@ export function poseExterior(aspecto: number): Pose {
 
 /** Ancho mínimo, en el plano de las puertas, que debe verse en la vista desde un piso (la torre más un margen). */
 const ANCHO_VISIBLE_PISO = TORRE.ancho + 1.4;
-const FOV_PISO = 40;
+const FOV_PISO_MIN = 40;
+const FOV_PISO_MAX = 75;
 /** Distancia preferida de la cámara a la pared de las puertas (en metros), de pie al fondo del pasillo. */
-const DISTANCIA_PISO = 9.4;
+const DISTANCIA_PISO = 10.6;
+/** Los letreros deben quedar a menos de esta parte de la mitad del ancho de la pantalla (el resto es margen). */
+const MARGEN_LETREROS = 0.88;
 
-/** Cámara de una persona esperando al fondo del pasillo de un piso, mirando la puerta del ascensor. */
+/** x del borde de los letreros y muebles más cercano a la cámara. */
+const X_BORDE_DECORACION = Math.min(
+  DECORACION.escaleras.x - DECORACION.escaleras.ancho / 2,
+  DECORACION.numero.x - DECORACION.numero.lado / 2,
+  DECORACION.banca.x - DECORACION.banca.ancho / 2,
+);
+/** Distancia lateral de la cámara (centrada en el pasillo) a la pared más lejana. */
+const LATERAL_PASILLO = Math.max(PARED_DERECHA_Z - TORRE.zc, TORRE.zc - PARED_IZQUIERDA_Z);
+
+/**
+ * Cámara de una persona esperando al fondo del pasillo de un piso, mirando la puerta del ascensor. El campo de
+ * visión se abre en lienzos angostos para que se vean completos los letreros de las paredes y el ancho de la torre.
+ */
 export function posePiso(piso: number, aspecto: number): Pose {
   const suelo = yPiso(piso);
-  const tFov = Math.tan(rad(FOV_PISO / 2));
-  // En pantallas angostas la cámara retrocede hasta que se vea el ancho de la torre (sin salirse del pasillo).
-  const distanciaNecesaria = ANCHO_VISIBLE_PISO / (2 * tFov * Math.max(aspecto, 0.3));
-  const x = Math.max(PASILLO.x0 + 0.6, TORRE.xPuertas - Math.max(DISTANCIA_PISO, distanciaNecesaria));
+  const x = Math.max(PASILLO.x0 + 0.6, TORRE.xPuertas - DISTANCIA_PISO);
+  // Tangente del medio ángulo horizontal que hace falta para ver cada cosa.
+  const paraLetreros = LATERAL_PASILLO / ((X_BORDE_DECORACION - x) * MARGEN_LETREROS);
+  const paraTorre = ANCHO_VISIBLE_PISO / 2 / (TORRE.xPuertas - x);
+  const tangenteVertical = Math.max(
+    Math.tan(rad(FOV_PISO_MIN / 2)),
+    Math.max(paraLetreros, paraTorre) / Math.max(aspecto, 0.3),
+  );
+  const fov = Math.min(FOV_PISO_MAX, (2 * Math.atan(tangenteVertical) * 180) / Math.PI);
   return {
     posicion: [x, suelo + 1.95, TORRE.zc],
     objetivo: [TORRE.xPuertas, suelo + 0.8, TORRE.zc],
-    fov: FOV_PISO,
+    fov,
   };
 }
 
-export function poseDe(vista: Vista, piso: number, aspecto: number): Pose {
-  return vista === 'exterior' ? poseExterior(aspecto) : posePiso(piso, aspecto);
+/** Encuadre de la vista exterior: todo el edificio, o el pie de la torre (P1, la cabina y la fila). */
+export type Encuadre = 'todo' | 'fila';
+
+const FILA = { azimut: 22, elevacion: 8, fov: 28, objetivo: [4, 1.1, 2] as Vec3, mitadAlto: 2.7, mitadAncho: 5.2 };
+
+/** Pie de la torre: el vestíbulo y el pozo de P1 con su fila y la cabina cuando está abajo. */
+export function poseFila(aspecto: number): Pose {
+  const t = Math.tan(rad(FILA.fov / 2));
+  const d = Math.max(FILA.mitadAlto / t, FILA.mitadAncho / (t * Math.max(aspecto, 0.3)));
+  const az = rad(FILA.azimut);
+  const el = rad(FILA.elevacion);
+  const [ox, oy, oz] = FILA.objetivo;
+  return {
+    posicion: [ox + d * Math.sin(az) * Math.cos(el), oy + d * Math.sin(el), oz + d * Math.cos(az) * Math.cos(el)],
+    objetivo: FILA.objetivo,
+    fov: FILA.fov,
+  };
+}
+
+export function poseDe(vista: Vista, piso: number, aspecto: number, encuadre: Encuadre = 'todo'): Pose {
+  if (vista === 'piso') return posePiso(piso, aspecto);
+  return encuadre === 'fila' ? poseFila(aspecto) : poseExterior(aspecto);
 }
 
 /** Límites de la cámara del usuario en la vista exterior (radianes y metros). */

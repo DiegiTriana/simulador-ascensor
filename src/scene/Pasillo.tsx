@@ -3,16 +3,26 @@
 
 import { PALETA } from './paleta.ts';
 import { Caja } from './piezas.tsx';
-import { ALTURA_PISO, GROSOR_LOSA, PASILLO, PUERTA, TORRE, etiquetaPiso, yPiso } from './medidas.ts';
+import {
+  ALTURA_PISO,
+  DECORACION,
+  GROSOR_LOSA,
+  PARED_DERECHA_Z,
+  PARED_IZQUIERDA_Z,
+  PASILLO,
+  PUERTA,
+  TORRE,
+  etiquetaPiso,
+  yPiso,
+} from './medidas.ts';
 import { useRotulo } from './rotulos.ts';
 
 const LARGO = PASILLO.x1 - PASILLO.x0;
 const X_CENTRO = (PASILLO.x0 + PASILLO.x1) / 2;
 const ALTO_LIBRE = ALTURA_PISO - GROSOR_LOSA;
 const GROSOR_PARED = 0.14;
-/** Plano de la cara interior de cada pared lateral. */
-const Z_IZQUIERDA = TORRE.z0;
-const Z_DERECHA = TORRE.z1 - 0.02;
+const Z_IZQUIERDA = PARED_IZQUIERDA_Z;
+const Z_DERECHA = PARED_DERECHA_Z;
 
 export function Pasillo({ piso }: { piso: number }) {
   const y = yPiso(piso);
@@ -48,19 +58,19 @@ function Estructura() {
 function Decoracion({ piso }: { piso: number }) {
   const numero = useRotulo(etiquetaPiso(piso), { fondo: PALETA.azul, tinta: PALETA.blanco, ancho: 160, alto: 160, radio: 36 });
   const escaleras = useRotulo('Escaleras', { fondo: PALETA.verdeOscuro, tinta: PALETA.blanco, ancho: 384, alto: 96 });
-  // Desde el fondo del pasillo solo se ven los últimos dos metros de cada pared: ahí va lo que se decora.
+  const { escaleras: e, numero: n, banca: b, maceta: m } = DECORACION;
   return (
     <group>
       {/* Pared izquierda: la puerta de las escaleras y una maceta. */}
-      <Caja posicion={[-1.2, 0.95, Z_IZQUIERDA + 0.04]} tam={[1.1, 1.9, 0.08]} color={PALETA.pizarra} radio={0.04} />
-      <Caja posicion={[-1.2 + 0.38, 0.95, Z_IZQUIERDA + 0.1]} tam={[0.08, 0.08, 0.06]} color={PALETA.amarillo} radio={0.02} sombra={false} />
+      <Caja posicion={[e.x, e.alto / 2, Z_IZQUIERDA + 0.04]} tam={[e.ancho, e.alto, 0.08]} color={PALETA.pizarra} radio={0.04} />
+      <Caja posicion={[e.x + e.ancho * 0.35, e.alto / 2, Z_IZQUIERDA + 0.1]} tam={[0.08, 0.08, 0.06]} color={PALETA.amarillo} radio={0.02} sombra={false} />
       {escaleras && (
-        <mesh position={[-1.2, 2.1, Z_IZQUIERDA + 0.02]}>
-          <planeGeometry args={[1.1, 0.275]} />
+        <mesh position={[e.x, e.letreroY, Z_IZQUIERDA + 0.02]}>
+          <planeGeometry args={[e.ancho, e.letreroAlto]} />
           <meshBasicMaterial map={escaleras} toneMapped={false} transparent />
         </mesh>
       )}
-      <group position={[-0.3, 0, Z_IZQUIERDA + 0.4]}>
+      <group position={[m.x, 0, Z_IZQUIERDA + 0.4]}>
         <mesh position={[0, 0.2, 0]} castShadow>
           <cylinderGeometry args={[0.24, 0.17, 0.4, 8]} />
           <meshStandardMaterial color={PALETA.cobre} roughness={0.95} flatShading />
@@ -72,15 +82,15 @@ function Decoracion({ piso }: { piso: number }) {
       </group>
       {/* Pared derecha: el número del piso sobre una banca. */}
       {numero && (
-        <mesh position={[-0.8, 1.6, Z_DERECHA - 0.01]} rotation={[0, Math.PI, 0]}>
-          <planeGeometry args={[0.7, 0.7]} />
+        <mesh position={[n.x, n.y, Z_DERECHA - 0.01]} rotation={[0, Math.PI, 0]}>
+          <planeGeometry args={[n.lado, n.lado]} />
           <meshBasicMaterial map={numero} toneMapped={false} transparent />
         </mesh>
       )}
-      <group position={[-0.8, 0, Z_DERECHA - 0.35]}>
-        <Caja posicion={[0, 0.42, 0]} tam={[1.4, 0.12, 0.45]} color={PALETA.ladrillo} radio={0.04} />
-        <Caja posicion={[-0.56, 0.18, 0]} tam={[0.12, 0.36, 0.36]} color={PALETA.pizarra} radio={0.03} />
-        <Caja posicion={[0.56, 0.18, 0]} tam={[0.12, 0.36, 0.36]} color={PALETA.pizarra} radio={0.03} />
+      <group position={[b.x, 0, Z_DERECHA - 0.35]}>
+        <Caja posicion={[0, b.alto - 0.08, 0]} tam={[b.ancho, 0.12, b.fondo]} color={PALETA.ladrillo} radio={0.04} />
+        <Caja posicion={[-(b.ancho / 2 - 0.1), 0.18, 0]} tam={[0.12, 0.36, 0.36]} color={PALETA.pizarra} radio={0.03} />
+        <Caja posicion={[b.ancho / 2 - 0.1, 0.18, 0]} tam={[0.12, 0.36, 0.36]} color={PALETA.pizarra} radio={0.03} />
       </group>
     </group>
   );

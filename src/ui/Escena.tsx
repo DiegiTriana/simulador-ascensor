@@ -56,6 +56,7 @@ function BarraDeEscena() {
   const fijarPiso = useEscena((s) => s.fijarPiso);
   const cambiarPiso = useEscena((s) => s.cambiarPiso);
   const restablecerCamara = useEscena((s) => s.restablecerCamara);
+  const verLaFila = useEscena((s) => s.verLaFila);
 
   return (
     <div className="escena-barra">
@@ -69,9 +70,14 @@ function BarraDeEscena() {
       </div>
 
       {vista === 'exterior' ? (
-        <button type="button" className="boton-barra" onClick={restablecerCamara}>
-          Ver todo
-        </button>
+        <div className="encuadres" role="group" aria-label="Acercar la cámara">
+          <button type="button" onClick={restablecerCamara}>
+            Ver todo
+          </button>
+          <button type="button" onClick={verLaFila}>
+            Ver la fila
+          </button>
+        </div>
       ) : (
         <div className="selector-piso" role="group" aria-label="Piso">
           <div className="pisos-lista">

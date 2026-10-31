@@ -6,7 +6,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { MathUtils, PerspectiveCamera, TOUCH, Vector3 } from 'three';
-import { limitesExterior, poseDe, type Pose, type Vista } from './vistas.ts';
+import { limitesExterior, poseDe, type Encuadre, type Pose, type Vista } from './vistas.ts';
 
 const DURACION_S = 0.8;
 const suave = (t: number) => t * t * (3 - 2 * t);
@@ -14,8 +14,9 @@ const suave = (t: number) => t * t * (3 - 2 * t);
 interface Props {
   vista: Vista;
   piso: number;
-  /** Cambia cada vez que se pide volver a la cámara de origen. */
-  restablecer: number;
+  encuadre: Encuadre;
+  /** Cambia cada vez que se pide un encuadre de la vista exterior (aunque sea el mismo). */
+  orden: number;
   sinMovimiento: boolean;
 }
 
@@ -34,7 +35,7 @@ function poseActual(camara: PerspectiveCamera, objetivo: Vector3): Pose {
   };
 }
 
-export function Camara({ vista, piso, restablecer, sinMovimiento }: Props) {
+export function Camara({ vista, piso, encuadre, orden, sinMovimiento }: Props) {
   const camara = useThree((s) => s.camera) as PerspectiveCamera;
   const lienzo = useThree((s) => s.gl.domElement);
   const aspecto = useThree((s) => s.size.width / s.size.height);
@@ -42,7 +43,7 @@ export function Camara({ vista, piso, restablecer, sinMovimiento }: Props) {
   const controles = useRef<ComponentRef<typeof OrbitControls>>(null);
   const objetivo = useRef(new Vector3());
   const deslizando = useRef<Deslizamiento | null>(null);
-  const previa = useRef<{ vista: Vista; piso: number; restablecer: number; aspecto: number } | null>(null);
+  const previa = useRef<{ vista: Vista; piso: number; orden: number; aspecto: number } | null>(null);
   const tocada = useRef(false);
   // Mientras la cámara se desliza, los controles quedan quietos: si no, sus límites de distancia la frenarían.
   const [deslizandoAhora, setDeslizandoAhora] = useState(false);
@@ -57,18 +58,18 @@ export function Camara({ vista, piso, restablecer, sinMovimiento }: Props) {
     invalidar();
   };
 
-  // Al cambiar de vista, de piso, al pedir restablecer o al cambiar la forma del lienzo, la cámara va a su pose.
+  // Al cambiar de vista, de piso, al pedir un encuadre o al cambiar la forma del lienzo, la cámara va a su pose.
   useEffect(() => {
     const anterior = previa.current;
-    previa.current = { vista, piso, restablecer, aspecto };
-    const destino = poseDe(vista, piso, aspecto);
+    previa.current = { vista, piso, orden, aspecto };
+    const destino = poseDe(vista, piso, aspecto, encuadre);
     if (!anterior) {
       colocar(destino);
       return;
     }
     const cambioDeVista = anterior.vista !== vista;
-    const pideRestablecer = anterior.restablecer !== restablecer;
-    if (cambioDeVista || pideRestablecer) {
+    const pideEncuadre = anterior.orden !== orden;
+    if (cambioDeVista || pideEncuadre) {
       tocada.current = false;
       if (sinMovimiento) {
         deslizando.current = null;
@@ -86,7 +87,7 @@ export function Camara({ vista, piso, restablecer, sinMovimiento }: Props) {
       colocar(destino);
     }
     // `colocar` solo usa refs y objetos de three, que no cambian.
-  }, [vista, piso, restablecer, aspecto, sinMovimiento]);
+  }, [vista, piso, encuadre, orden, aspecto, sinMovimiento]);
 
   useFrame(() => {
     const d = deslizando.current;

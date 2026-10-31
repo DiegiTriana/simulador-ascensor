@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { PISO_MAXIMO } from '../scene/medidas.ts';
-import type { Vista } from '../scene/vistas.ts';
+import type { Encuadre, Vista } from '../scene/vistas.ts';
 
 export const PISO_INICIAL = 1;
 
@@ -13,12 +13,15 @@ interface EscenaStore {
   vista: Vista;
   /** Piso de la vista desde un piso: 1..9. */
   piso: number;
-  /** Sube cada vez que se pide volver a la cámara de origen de la vista exterior. */
-  restablecer: number;
+  /** Encuadre de la vista exterior: todo el edificio o el pie de la torre. */
+  encuadre: Encuadre;
+  /** Sube cada vez que se pide un encuadre, aunque sea el mismo, para que la cámara vuelva a él. */
+  orden: number;
   fijarVista: (vista: Vista) => void;
   fijarPiso: (piso: number) => void;
   cambiarPiso: (delta: number) => void;
   restablecerCamara: () => void;
+  verLaFila: () => void;
 }
 
 /** Solo en desarrollo: ?vista=piso&piso=4 abre la escena ya en esa vista. */
@@ -34,9 +37,11 @@ function inicial(busqueda: string): Pick<EscenaStore, 'vista' | 'piso'> {
 
 export const useEscena = create<EscenaStore>((set) => ({
   ...inicial(typeof window === 'undefined' ? '' : window.location.search),
-  restablecer: 0,
+  encuadre: 'todo',
+  orden: 0,
   fijarVista: (vista) => set({ vista }),
   fijarPiso: (piso) => set({ piso: limitarPiso(piso) }),
   cambiarPiso: (delta) => set((s) => ({ piso: limitarPiso(s.piso + delta) })),
-  restablecerCamara: () => set((s) => ({ vista: 'exterior', restablecer: s.restablecer + 1 })),
+  restablecerCamara: () => set((s) => ({ vista: 'exterior', encuadre: 'todo', orden: s.orden + 1 })),
+  verLaFila: () => set((s) => ({ vista: 'exterior', encuadre: 'fila', orden: s.orden + 1 })),
 }));
