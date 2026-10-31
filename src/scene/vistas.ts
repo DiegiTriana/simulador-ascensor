@@ -110,6 +110,20 @@ export function poseFila(aspecto: number): Pose {
   };
 }
 
+/**
+ * Solo en desarrollo, en la vista desde un piso: ?camara=px,py,pz,ox,oy,oz[,fov] pone la cámara donde se pida (por
+ * ejemplo, cerca de una persona para revisar sus accesorios). Devuelve null si falta o es inválido.
+ */
+export function poseDePrueba(busqueda: string): Pose | null {
+  const valor = new URLSearchParams(busqueda).get('camara');
+  if (!valor) return null;
+  const n = valor.split(',').map((x) => Number(x.trim()));
+  if (n.length < 6 || n.length > 7 || n.some((x) => !Number.isFinite(x))) return null;
+  const fov = n[6] ?? 40;
+  if (fov < 10 || fov > 100) return null;
+  return { posicion: [n[0], n[1], n[2]], objetivo: [n[3], n[4], n[5]], fov };
+}
+
 export function poseDe(vista: Vista, piso: number, aspecto: number, encuadre: Encuadre = 'todo'): Pose {
   if (vista === 'piso') return posePiso(piso, aspecto);
   return encuadre === 'fila' ? poseFila(aspecto) : poseExterior(aspecto);

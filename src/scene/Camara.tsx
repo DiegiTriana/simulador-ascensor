@@ -6,7 +6,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { MathUtils, PerspectiveCamera, TOUCH, Vector3 } from 'three';
-import { limitesExterior, poseDe, type Encuadre, type Pose, type Vista } from './vistas.ts';
+import { limitesExterior, poseDe, poseDePrueba, type Encuadre, type Pose, type Vista } from './vistas.ts';
 
 const DURACION_S = 0.8;
 const suave = (t: number) => t * t * (3 - 2 * t);
@@ -62,7 +62,9 @@ export function Camara({ vista, piso, encuadre, orden, sinMovimiento }: Props) {
   useEffect(() => {
     const anterior = previa.current;
     previa.current = { vista, piso, orden, aspecto };
-    const destino = poseDe(vista, piso, aspecto, encuadre);
+    // Solo en desarrollo y en la vista desde un piso, la dirección puede poner la cámara donde quiera (?camara=...).
+    const prueba = import.meta.env.DEV && vista === 'piso' ? poseDePrueba(window.location.search) : null;
+    const destino = prueba ?? poseDe(vista, piso, aspecto, encuadre);
     if (!anterior) {
       colocar(destino);
       return;

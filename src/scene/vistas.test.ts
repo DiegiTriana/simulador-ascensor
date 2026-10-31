@@ -10,7 +10,7 @@ import {
   Y_TECHO,
   yPiso,
 } from './medidas.ts';
-import { limitesExterior, poseDe, poseExterior, poseFila, posePiso, type Pose, type Vec3 } from './vistas.ts';
+import { limitesExterior, poseDe, poseDePrueba, poseExterior, poseFila, posePiso, type Pose, type Vec3 } from './vistas.ts';
 
 const ASPECTOS = [0.7, 1, 1.39, 1.6, 2.4];
 
@@ -195,5 +195,20 @@ describe('encuadre «Ver la fila»', () => {
         expect(fila.objetivo[i]).toBeLessThanOrEqual(l.objetivoMax[i]);
       }
     }
+  });
+});
+
+describe('cámara de prueba (solo desarrollo)', () => {
+  it('lee la posición, el punto que mira y el campo de visión', () => {
+    expect(poseDePrueba('?camara=1,2,3,4,5,6')).toEqual({ posicion: [1, 2, 3], objetivo: [4, 5, 6], fov: 40 });
+    expect(poseDePrueba('?vista=piso&camara=1.5, 2, 3, 4, 5, 6, 55')?.fov).toBe(55);
+  });
+
+  it('descarta lo que falta o está mal escrito', () => {
+    expect(poseDePrueba('')).toBeNull();
+    expect(poseDePrueba('?camara=1,2,3')).toBeNull();
+    expect(poseDePrueba('?camara=a,b,c,d,e,f')).toBeNull();
+    expect(poseDePrueba('?camara=1,2,3,4,5,6,500')).toBeNull();
+    expect(poseDePrueba('?camara=1,2,3,4,5,6,40,9')).toBeNull();
   });
 });

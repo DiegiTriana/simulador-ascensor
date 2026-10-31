@@ -355,6 +355,85 @@ describe('las escaleras', () => {
   });
 });
 
+describe('«+N personas»: las que esperan además de las que se dibujan', () => {
+  it('en cada piso es lo que sobra después de las 12 primeras, igual que contar a mano', () => {
+    let conExtras = 0;
+    for (const t of muestras(CARGA.traza.finS, 400)) {
+      const v = estadoEn(ixCarga, t);
+      expect(v.extras).toHaveLength(PISO_MAXIMO + 1);
+      expect(v.extras[1]).toBe(Math.max(0, indicadoresEn(ixCarga, t).fila - MAX_POR_PISO));
+      for (const n of v.extras) expect(Number.isInteger(n) && n >= 0).toBe(true);
+      if (v.extras[1] > 0) conExtras++;
+    }
+    expect(conExtras).toBeGreaterThan(20);
+  });
+
+  it('el miércoles (fila máxima de 21) tiene extras a ratos y ninguno al terminar', () => {
+    const vistos = muestras(MIERCOLES.traza.finS, 400).map((t) => estadoEn(ixMiercoles, t).extras[1]);
+    expect(Math.max(...vistos)).toBeGreaterThan(0);
+    expect(Math.max(...vistos)).toBeLessThanOrEqual(21 - MAX_POR_PISO);
+    // El miércoles ya hay 16 esperando al empezar (15 de la clase anterior y 1 que llega): 4 más de las 12 que se dibujan.
+    expect(estadoEn(ixMiercoles, 0).extras[1]).toBe(Math.max(0, indicadoresEn(ixMiercoles, 0).fila - MAX_POR_PISO));
+    expect(estadoEn(ixMiercoles, MIERCOLES.traza.finS).extras.every((n) => n === 0)).toBe(true);
+  });
+
+  it('dibujadas + extras = personas en la fila', () => {
+    for (const t of muestras(CARGA.traza.finS, 200)) {
+      const v = estadoEn(ixCarga, t);
+      const fila = indicadoresEn(ixCarga, t).fila;
+      const dibujadasEnP1 = v.personas.filter((p) => p.y === yPiso(1) && p.x < TORRE.xPuertas - 0.3 && p.tipo !== 'aseo').length;
+      // Quienes caminan por el vestíbulo (suben o se van) no están ya en la fila; las que llegan sí.
+      expect(dibujadasEnP1 + v.extras[1]).toBeGreaterThanOrEqual(Math.min(fila, MAX_POR_PISO));
+    }
+  });
+});
+
+describe('silla de ruedas y muletas dentro de la cabina', () => {
+  const CON_ESPECIALES = corridaAnimada(
+    { horaInicioMin: 720, duracionMin: 40, llegadasP1: 700, bajan: 120, sillas: 8, muletas: 12, usosAseo: 4 },
+    2,
+  );
+  const ixEspeciales = construirIndice(CON_ESPECIALES.traza);
+  const aBordo = (t: number) => {
+    const v = estadoEn(ixEspeciales, t);
+    const y = yPiso(v.cabina.piso) + 0.02;
+    return v.personas.filter((p) => Math.abs(p.y - y) < 1e-6 && p.x > CABINA.xCentro - CABINA.fondo / 2 && !p.caminando);
+  };
+
+  it('hay momentos con silla y con muletas a bordo, para que la prueba valga', () => {
+    const ts = muestras(CON_ESPECIALES.traza.finS, 3000);
+    expect(ts.some((t) => aBordo(t).some((p) => p.tipo === 'silla'))).toBe(true);
+    expect(ts.some((t) => aBordo(t).some((p) => p.tipo === 'muletas'))).toBe(true);
+  });
+
+  it('nadie queda encima de otra persona en la cabina, y todos dentro de ella', () => {
+    for (const t of muestras(CON_ESPECIALES.traza.finS, 3000)) {
+      const dentro = aBordo(t);
+      for (let i = 0; i < dentro.length; i++) {
+        expect(Math.abs(dentro[i].x - CABINA.xCentro)).toBeLessThanOrEqual(CABINA.fondo / 2);
+        expect(Math.abs(dentro[i].z - TORRE.zc)).toBeLessThanOrEqual(CABINA.ancho / 2);
+        for (let j = i + 1; j < dentro.length; j++) {
+          expect(Math.hypot(dentro[i].x - dentro[j].x, dentro[i].z - dentro[j].z), `t=${t}`).toBeGreaterThanOrEqual(0.7);
+        }
+      }
+    }
+  });
+
+  it('la silla de ruedas va en el centro de su hilera y las muletas entre dos columnas', () => {
+    for (const t of muestras(CON_ESPECIALES.traza.finS, 3000)) {
+      for (const p of aBordo(t)) {
+        if (p.tipo === 'silla') expect(p.z).toBeCloseTo(TORRE.zc, 6);
+        if (p.tipo === 'muletas') expect(Math.abs(p.z - TORRE.zc)).toBeCloseTo(0.7, 6);
+      }
+    }
+  });
+
+  it('quien usa silla de ruedas o muletas nunca se va por las escaleras', () => {
+    const noSeVan = new Set(CON_ESPECIALES.traza.personas.filter((p) => p.tipo === 'silla' || p.tipo === 'muletas').map((p) => p.id));
+    for (const e of CON_ESPECIALES.traza.eventos) if (e.tipo === 'escaleras') expect(noSeVan.has(e.persona)).toBe(false);
+  });
+});
+
 describe('formatoReloj', () => {
   it('suma los segundos de la corrida a la hora de inicio', () => {
     expect(formatoReloj(12 * 60 + 40, 0)).toBe('12:40:00');

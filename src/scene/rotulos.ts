@@ -28,8 +28,8 @@ export function fuentesListas(): Promise<void> {
   );
 }
 
-export function crearRotulo(texto: string, op: OpcionesRotulo): CanvasTexture {
-  const canvas = document.createElement('canvas');
+/** Dibuja un rótulo en un canvas del tamaño de `op` (borra lo que hubiera). */
+export function dibujarRotulo(canvas: HTMLCanvasElement, texto: string, op: OpcionesRotulo): void {
   canvas.width = op.ancho;
   canvas.height = op.alto;
   const ctx = canvas.getContext('2d');
@@ -68,6 +68,11 @@ export function crearRotulo(texto: string, op: OpcionesRotulo): CanvasTexture {
       ctx.fill();
     }
   }
+}
+
+export function crearRotulo(texto: string, op: OpcionesRotulo): CanvasTexture {
+  const canvas = document.createElement('canvas');
+  dibujarRotulo(canvas, texto, op);
   const textura = new CanvasTexture(canvas);
   textura.colorSpace = SRGBColorSpace;
   textura.anisotropy = 4;

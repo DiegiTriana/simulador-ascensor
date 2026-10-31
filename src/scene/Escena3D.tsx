@@ -7,6 +7,7 @@ import type { TipoPersona } from '../sim/tipos.ts';
 import { useAnimacion } from '../store/animacion.ts';
 import { useEscena } from '../store/escena.ts';
 import { Camara } from './Camara.tsx';
+import { ColasExtra } from './ColasExtra.tsx';
 import { estadoEn } from './corrida.ts';
 import { Edificio } from './Edificio.tsx';
 import { estadoDePrueba, estadoDePruebaConParametros } from './estado.ts';
@@ -68,6 +69,7 @@ export default function Escena3D({ alPerderContexto }: Props) {
       <Edificio />
       <Torre manejadores={manejadores} />
       <Poblacion manejadores={manejadores} />
+      <ColasExtra manejadores={manejadores} />
       <Animador manejadores={manejadores} muestra={muestra} />
       {vista === 'piso' && <Pasillo piso={piso} />}
       <Camara vista={vista} piso={piso} encuadre={encuadre} orden={orden} sinMovimiento={sinMovimiento} />

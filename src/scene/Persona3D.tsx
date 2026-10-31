@@ -7,7 +7,8 @@ import { useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { AnimationMixer, type Group } from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { ALTURA_PERSONA } from '../data/modelos.ts';
+import { ALTURA_PERSONA, CLIPS_SILLA } from '../data/modelos.ts';
+import { CarritoAseo, Muletas, SillaDeRuedas } from './Accesorios.tsx';
 import type { TipoPersona } from '../sim/tipos.ts';
 import type { Manejadores } from './manejadores.ts';
 import { nombreModelo, useModelo } from './modelos.ts';
@@ -50,20 +51,30 @@ export function Persona3D({ id, tipo, manejadores }: Props) {
 
   return (
     <group ref={grupo}>
-      {modelo.estado === 'listo' && <ModeloClonado gltf={modelo.gltf} id={id} pose={pose} manejadores={manejadores} />}
+      {modelo.estado === 'listo' && <ModeloClonado gltf={modelo.gltf} id={id} tipo={tipo} pose={pose} manejadores={manejadores} />}
       {modelo.estado === 'error' && <FiguraSimple id={id} />}
     </group>
   );
 }
 
+/** Pose quieta y pose en movimiento de cada tipo de persona (clips del paquete de Kenney). */
+export function clipsDe(tipo: TipoPersona): { quieta: string; camina: string } {
+  if (tipo === 'silla') return { quieta: CLIPS_SILLA[0], camina: 'wheelchair-move-forward' };
+  // Con el carrito, quieto tiene las dos manos al frente (en el manubrio); en movimiento camina.
+  if (tipo === 'aseo') return { quieta: 'holding-both', camina: 'walk' };
+  return { quieta: 'idle', camina: 'walk' };
+}
+
 function ModeloClonado({
   gltf,
   id,
+  tipo,
   pose,
   manejadores,
 }: {
   gltf: GLTF;
   id: number;
+  tipo: TipoPersona;
   pose: MutableRefObject<AplicarPose | null>;
   manejadores: Manejadores;
 }) {
@@ -75,12 +86,16 @@ function ModeloClonado({
       o.receiveShadow = true;
     });
     const mezclador = new AnimationMixer(raiz);
-    const clipQuieta = gltf.animations.find((a) => a.name === 'idle');
-    const clipCamina = gltf.animations.find((a) => a.name === 'walk');
+    const nombres = clipsDe(tipo);
+    const clipQuieta = gltf.animations.find((a) => a.name === nombres.quieta);
+    const clipCamina = gltf.animations.find((a) => a.name === nombres.camina);
     const quieta = clipQuieta ? mezclador.clipAction(clipQuieta).play() : null;
     const camina = clipCamina ? mezclador.clipAction(clipCamina).play() : null;
     return { raiz, mezclador, quieta, camina };
-  }, [gltf]);
+  }, [gltf, tipo]);
+
+  // Las muletas siguen a las manos: se acomodan cada vez que cambia la pose.
+  const muletas = useRef<(() => void) | null>(null);
 
   useLayoutEffect(() => {
     let ultima = '';
@@ -95,6 +110,7 @@ function ModeloClonado({
       if (quieta) quieta.weight = andando ? 0 : 1;
       if (camina) camina.weight = andando ? 1 : 0;
       mezclador.setTime(fase * accion.getClip().duration);
+      muletas.current?.();
     };
     const inicial = manejadores.ultima.get(id);
     if (inicial) pose.current(inicial);
@@ -106,7 +122,14 @@ function ModeloClonado({
     };
   }, [mezclador, raiz, quieta, camina, pose, manejadores, id, invalidar]);
 
-  return <primitive object={raiz} />;
+  return (
+    <>
+      <primitive object={raiz} />
+      {tipo === 'silla' && <SillaDeRuedas />}
+      {tipo === 'muletas' && <Muletas raiz={raiz} enlace={muletas} />}
+      {tipo === 'aseo' && <CarritoAseo />}
+    </>
+  );
 }
 
 /** Figura de respaldo: cuerpo y cabeza de cubo, de la altura de una persona. */

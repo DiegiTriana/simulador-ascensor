@@ -8,7 +8,7 @@
 
 import { PARAMETROS as P } from '../data/parametros.ts';
 import type { TipoPersona, Traza } from '../sim/tipos.ts';
-import { desvio, lugarEnCabina, lugarEnFila } from './disposicion.ts';
+import { CELDAS_CABINA, asignarCeldas, desvio, lugarEnFila, puntoDeCeldas } from './disposicion.ts';
 import { CABINA, DECORACION, PARED_IZQUIERDA_Z, PISO_MAXIMO, TORRE, yPiso } from './medidas.ts';
 import type { CabinaVista, EstadoVista, PersonaVista } from './vista.ts';
 
@@ -32,7 +32,6 @@ const ENTRADA_X = -4;
 const SALIDA_X = -4;
 const X_PUERTA = TORRE.xPuertas - 0.45;
 const X_ASEO_SOTANO = 2.2;
-const LUGARES_CABINA = 12;
 const EPS = 1e-4;
 
 export interface DatosPersona {
@@ -47,8 +46,9 @@ export interface DatosPersona {
   tEscaleras: number | null;
   /** Solo el aseo: cuando termina en el sótano. */
   tTermina: number | null;
-  /** Lugar que ocupa dentro de la cabina (se asigna al subir). */
-  lugar: number;
+  /** Celdas de la cabina que ocupa (una por cupo: silla de ruedas 3, muletas 2) y el punto donde se para. Se asignan al subir. */
+  celdas: number[];
+  puntoCabina: { x: number; z: number };
   /** Segundo en que deja la fila: sube o se va por las escaleras (Infinity si no). */
   salidaFila: number;
   aseo: boolean;
@@ -124,7 +124,8 @@ const primeroMayor = hasta;
 function datos(p: Traza['personas'][number]): DatosPersona {
   return {
     id: p.id, tipo: p.tipo, origen: p.origen, destino: p.destino, cupos: p.cupos, llegada: p.llegada,
-    tSube: null, tBaja: null, tEscaleras: null, tTermina: null, lugar: 0, salidaFila: Infinity, aseo: p.tipo === 'aseo',
+    tSube: null, tBaja: null, tEscaleras: null, tTermina: null, celdas: [], puntoCabina: { x: 0, z: 0 }, salidaFila: Infinity,
+    aseo: p.tipo === 'aseo',
   };
 }
 
@@ -141,7 +142,7 @@ export function construirIndice(traza: Traza): Indice {
   }
   const usosAseo: DatosPersona[] = [];
   let usoABordo: DatosPersona | null = null;
-  const libres = Array.from({ length: LUGARES_CABINA }, (_, i) => i);
+  const usadas = CELDAS_CABINA.map(() => 0);
   const abordo: DatosPersona[] = [];
   const cambios: Cambio[] = [];
   const movimientos: Movimiento[] = [];
@@ -174,7 +175,9 @@ export function construirIndice(traza: Traza): Indice {
         if (!d) break;
         d.tSube = e.t;
         d.salidaFila = e.t;
-        d.lugar = libres.shift() ?? 0;
+        d.celdas = asignarCeldas(usadas, d.cupos);
+        for (const i of d.celdas) usadas[i]++;
+        d.puntoCabina = puntoDeCeldas(d.celdas);
         abordo.push(d);
         registrarCambio(e.t);
         break;
@@ -183,8 +186,7 @@ export function construirIndice(traza: Traza): Indice {
         const d = e.persona === -1 ? usoABordo : normales.get(e.persona);
         if (!d) break;
         d.tBaja = e.t;
-        libres.push(d.lugar);
-        libres.sort((a, b) => a - b);
+        for (const i of d.celdas) usadas[i]--;
         abordo.splice(abordo.indexOf(d), 1);
         registrarCambio(e.t);
         break;
@@ -358,6 +360,11 @@ function ventana(f: FilaPiso, t: number, max: number): DatosPersona[] {
   return res;
 }
 
+/** Personas en la fila de un piso en el segundo t (sin el personal de aseo). */
+function esperandoEn(f: FilaPiso, t: number): number {
+  return hasta(f.llegadasContadas, t) - hasta(f.salidasContadas, t);
+}
+
 /** Último segundo ≤ t en que alguien dejó la fila de este piso (−Infinity si nadie). */
 function ultimaSalida(f: FilaPiso, t: number): number {
   const k = hasta(f.salidasOrdenadas, t);
@@ -397,19 +404,22 @@ function poseFilaEn(ix: Indice, p: DatosPersona, t: number, aunSinVerse: boolean
 // ---------------------------------------------------------------- estado en un segundo
 
 /** Dónde queda en el mundo el lugar de una persona dentro de la cabina, que está a la altura `y`. */
-const lugarDeCabina = (p: DatosPersona, y: number): readonly [number, number, number] => {
-  const l = lugarEnCabina(Math.min(p.lugar, LUGARES_CABINA - 1));
-  return [CABINA.xCentro + l.x, y, TORRE.zc + l.z];
-};
+const lugarDeCabina = (p: DatosPersona, y: number): readonly [number, number, number] => [
+  CABINA.xCentro + p.puntoCabina.x,
+  y,
+  TORRE.zc + p.puntoCabina.z,
+];
 
 export function estadoEn(ix: Indice, t: number): EstadoVista {
   const cabina = cabinaEn(ix, t);
   const personas: PersonaVista[] = [];
+  const extras: number[] = [];
   const yCabina = yPiso(cabina.piso) + 0.02;
 
-  // 1. Quienes esperan en cada piso (solo las primeras de la fila).
+  // 1. Quienes esperan en cada piso (solo las primeras de la fila; de las demás, cuántas son).
   for (let piso = 0; piso <= PISO_MAXIMO; piso++) {
     const f = ix.filas[piso];
+    extras.push(Math.max(0, esperandoEn(f, t) - MAX_POR_PISO));
     if (f.personas.length === 0) continue;
     const ahora = ventana(f, t, MAX_POR_PISO);
     if (ahora.length === 0) continue;
@@ -474,7 +484,7 @@ export function estadoEn(ix: Indice, t: number): EstadoVista {
     }
   }
 
-  return { cabina, personas };
+  return { cabina, personas, extras };
 }
 
 // ---------------------------------------------------------------- indicadores
@@ -501,7 +511,7 @@ export function indicadoresEn(ix: Indice, t: number): Indicadores {
     sentido: cabina.sentido,
     ocupantes: c >= 0 ? ix.cambios[c].abordo.length : 0,
     cupos: c >= 0 ? ix.cambios[c].cupos : 0,
-    fila: hasta(f.llegadasContadas, t) - hasta(f.salidasContadas, t),
+    fila: esperandoEn(f, t),
     escaleras: hasta(ix.tiemposEscaleras, t),
   };
 }

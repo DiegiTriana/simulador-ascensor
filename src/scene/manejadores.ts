@@ -23,6 +23,8 @@ export interface Manejadores {
   /** Una textura por sentido y piso, listas cuando la fuente está cargada. */
   texturasIndicador: Map<string, CanvasTexture> | null;
   personas: Map<number, ManejadorPersona>;
+  /** El rótulo «+N personas» de cada piso, de S (0) a P9; null hasta que la fuente está lista. */
+  colasExtra: ({ poner(n: number): void } | null)[];
   /** Última pose pedida de cada persona, para las que se montan después de pedirla. */
   ultima: Map<number, PersonaVista>;
   alCambiarPersonas: ((lista: { id: number; tipo: TipoPersona }[]) => void) | null;
@@ -40,6 +42,7 @@ export function crearManejadores(): Manejadores {
     materialIndicador: null,
     texturasIndicador: null,
     personas: new Map(),
+    colasExtra: Array.from({ length: PISO_MAXIMO + 1 }, () => null),
     ultima: new Map(),
     alCambiarPersonas: null,
     _aperturaPisos: Array.from({ length: PISO_MAXIMO + 1 }, () => -1),
@@ -94,4 +97,5 @@ export function aplicarVista(m: Manejadores, v: EstadoVista): void {
     m.alCambiarPersonas?.(v.personas.map((p) => ({ id: p.id, tipo: p.tipo })));
   }
   for (const p of v.personas) m.personas.get(p.id)?.poner(p);
+  v.extras.forEach((n, piso) => m.colasExtra[piso]?.poner(n));
 }

@@ -32,17 +32,23 @@ function filasVacias(): PersonaEscena[][] {
   return Array.from({ length: PISO_MAXIMO + 1 }, () => []);
 }
 
-/** Estado fijo de prueba: cabina en P1 con las puertas abiertas y gente esperando en P1, P4 y P7. */
+const como = (personas: PersonaEscena[], id: number, tipo: TipoPersona): PersonaEscena[] =>
+  personas.map((p) => (p.id === id ? { ...p, tipo } : p));
+
+/**
+ * Estado fijo de muestra: cabina en P1 con las puertas abiertas y gente esperando en P1, P4 y P7, con una silla de
+ * ruedas y alguien con muletas, para ver cómo se ven. El personal de aseo con su carrito solo aparece en una corrida.
+ */
 export function estadoDePrueba(): EstadoEscena {
   const filas = filasVacias();
-  filas[1] = gente(10, 9);
+  filas[1] = como(como(gente(10, 9), 11, 'silla'), 12, 'muletas');
   filas[4] = gente(30, 2);
   filas[7] = gente(40, 1);
-  return { cabina: { piso: 1, puertas: 1, sentido: 0, ocupantes: gente(0, 4) }, filas };
+  return { cabina: { piso: 1, puertas: 1, sentido: 0, ocupantes: como(gente(0, 4), 1, 'muletas') }, filas };
 }
 
 /**
- * Solo en desarrollo: la dirección puede cambiar el estado de prueba (?cabina=4.5&puertas=0&ocupantes=8) para
+ * Solo en desarrollo: la dirección puede cambiar el estado de prueba (?cabina=4.5&puertas=0&ocupantes=8&fila=20) para
  * revisar la escena sin simulación. En la versión publicada no hace nada.
  */
 export function estadoDePruebaConParametros(busqueda: string): EstadoEscena {
@@ -58,6 +64,8 @@ export function estadoDePruebaConParametros(busqueda: string): EstadoEscena {
   if (piso !== null) estado.cabina.piso = Math.min(PISO_MAXIMO, Math.max(PISO_SOTANO, piso));
   const puertas = num('puertas');
   if (puertas !== null) estado.cabina.puertas = Math.min(1, Math.max(0, puertas));
+  const fila = num('fila');
+  if (fila !== null) estado.filas[1] = gente(10, Math.min(3000, Math.max(0, Math.floor(fila))));
   const ocupantes = num('ocupantes');
   if (ocupantes !== null) estado.cabina.ocupantes = gente(0, Math.min(10, Math.max(0, Math.floor(ocupantes))));
   return estado;

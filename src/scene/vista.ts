@@ -3,6 +3,7 @@
 // y `aVista` (del estado fijo de muestra).
 
 import type { TipoPersona } from '../sim/tipos.ts';
+import { MAX_POR_PISO } from './corrida.ts';
 import { lugarEnCabina, lugarEnFila } from './disposicion.ts';
 import type { EstadoEscena } from './estado.ts';
 import { CABINA, TORRE, yPiso } from './medidas.ts';
@@ -31,13 +32,15 @@ export interface CabinaVista {
 export interface EstadoVista {
   cabina: CabinaVista;
   personas: PersonaVista[];
+  /** Por piso (0 = sótano): cuántas personas esperan además de las que se dibujan («+N personas»). */
+  extras: number[];
 }
 
 /** Estado fijo de muestra → lo mismo que se dibuja con una corrida, con todos quietos. */
 export function aVista(e: EstadoEscena): EstadoVista {
   const personas: PersonaVista[] = [];
   e.filas.forEach((fila, piso) => {
-    fila.forEach((p, i) => {
+    fila.slice(0, MAX_POR_PISO).forEach((p, i) => {
       const l = lugarEnFila(i, p.id);
       personas.push({ id: p.id, tipo: p.tipo, x: l.x, y: yPiso(piso), z: l.z, giro: l.giro, caminando: false, ciclos: 0.5 + (p.id % 7) / 14 });
     });
@@ -49,5 +52,9 @@ export function aVista(e: EstadoEscena): EstadoVista {
       id: p.id, tipo: p.tipo, x: CABINA.xCentro + l.x, y: yCabina, z: TORRE.zc + l.z, giro: l.giro, caminando: false, ciclos: 0.5 + (p.id % 7) / 14,
     });
   });
-  return { cabina: { piso: e.cabina.piso, puertas: e.cabina.puertas, sentido: e.cabina.sentido }, personas };
+  return {
+    cabina: { piso: e.cabina.piso, puertas: e.cabina.puertas, sentido: e.cabina.sentido },
+    personas,
+    extras: e.filas.map((fila) => Math.max(0, fila.length - MAX_POR_PISO)),
+  };
 }
