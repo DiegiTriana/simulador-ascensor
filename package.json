@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "tabla": "node scripts/tabla-miercoles.ts",
-    "modelos": "node scripts/preparar-modelos.ts"
+    "modelos": "node scripts/preparar-modelos.ts",
+    "traza": "node scripts/medir-traza.ts"
   },
   "dependencies": {
     "@react-three/drei": "10.7.9",

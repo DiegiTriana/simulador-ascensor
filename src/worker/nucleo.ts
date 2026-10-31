@@ -1,7 +1,7 @@
 // Lógica del worker sin tocar `self`: recibe peticiones y envía respuestas por una función.
 // Así se prueba en Node igual que corre en el navegador.
 
-import { comparar } from '../sim/corridas.ts';
+import { comparar, semillaDeCorrida } from '../sim/corridas.ts';
 import { validarEntradas } from '../sim/llegadas.ts';
 import { CONFIG_DEFECTO, simularEntradas } from '../sim/simulacion.ts';
 import type { Resultado } from '../sim/tipos.ts';
@@ -29,7 +29,7 @@ export function crearNucleo(enviar: (r: Respuesta) => void) {
           enviar({ tipo: 'cancelado', generacion });
           return;
         }
-        resultados.push(simularEntradas(entradas, semilla + i, CONFIG_DEFECTO));
+        resultados.push(simularEntradas(entradas, semillaDeCorrida(semilla, i), CONFIG_DEFECTO));
         enviar({ tipo: 'progreso', generacion, hechas: i + 1, total: corridas });
       }
       await ceder();

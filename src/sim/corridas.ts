@@ -4,7 +4,7 @@ import { PARAMETROS as P } from '../data/parametros.ts';
 import { mm1k, type ResultadoMM1K } from './formulas.ts';
 import { CONFIG_DEFECTO, simularEntradas } from './simulacion.ts';
 import type { OpcionesEscenario } from './llegadas.ts';
-import type { Entradas, Resultado } from './tipos.ts';
+import { crearTraza, type Entradas, type Resultado, type Traza } from './tipos.ts';
 
 export interface Estadistica {
   media: number;
@@ -32,13 +32,32 @@ export interface Comparacion {
   formulasPico: ResultadoMM1K | null;
 }
 
+/** Semilla de la corrida número `i` (la 0 es la primera, la que se anima). */
+export const semillaDeCorrida = (semillaBase: number, i: number): number => semillaBase + i;
+
 export function correrVarias(
   entradas: Entradas,
   n = 10,
   semillaBase = 1,
   opciones: OpcionesEscenario = {},
 ): Resultado[] {
-  return Array.from({ length: n }, (_, i) => simularEntradas(entradas, semillaBase + i, CONFIG_DEFECTO, opciones));
+  return Array.from({ length: n }, (_, i) =>
+    simularEntradas(entradas, semillaDeCorrida(semillaBase, i), CONFIG_DEFECTO, opciones),
+  );
+}
+
+/**
+ * La corrida que se anima: exactamente la primera de las que promedia la tabla (misma semilla derivada), con su
+ * traza. Su `resultado` es igual, dato por dato, a `correrVarias(entradas, n, semillaBase)[0]`.
+ */
+export function corridaAnimada(
+  entradas: Entradas,
+  semillaBase = 1,
+  opciones: OpcionesEscenario = {},
+): { resultado: Resultado; traza: Traza } {
+  const traza = crearTraza();
+  const resultado = simularEntradas(entradas, semillaDeCorrida(semillaBase, 0), CONFIG_DEFECTO, opciones, traza);
+  return { resultado, traza };
 }
 
 export function comparar(entradas: Entradas, corridas: Resultado[]): Comparacion {

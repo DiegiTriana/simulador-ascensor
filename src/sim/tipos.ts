@@ -87,3 +87,46 @@ export interface Resultado {
   aseoAtendidos: number;
   vueltas: Vuelta[];
 }
+
+/** Lo que la escena necesita saber de cada persona de la corrida animada (la de aseo lleva id −1). */
+export interface PersonaTraza {
+  id: number;
+  tipo: TipoPersona;
+  cupos: number;
+  origen: number;
+  destino: number;
+  /** Segundo (desde el inicio de la franja) en que llega y se pone en la fila. */
+  llegada: number;
+}
+
+/**
+ * Hechos de la corrida, con su segundo simulado (desde el inicio de la franja), en el orden en que ocurren.
+ * La escena calcula con ellos el estado en cualquier segundo.
+ */
+export type EventoTraza =
+  /** La cabina sale del piso `desde` hacia `hacia` y llega en `llega` (5 s por piso). */
+  | { t: number; tipo: 'mueve'; desde: number; hacia: number; llega: number }
+  /** Empieza a abrir las puertas (quedan abiertas del todo 3,3 s después). */
+  | { t: number; tipo: 'abre'; piso: number }
+  | { t: number; tipo: 'abierta'; piso: number }
+  /** Empieza a cerrar (quedan cerradas 4,3 s después). */
+  | { t: number; tipo: 'cierra'; piso: number }
+  | { t: number; tipo: 'cerrada'; piso: number }
+  /** La persona entra a la cabina. Con las puertas abiertas se entra y se sale de a una, 2 s cada una. */
+  | { t: number; tipo: 'sube'; persona: number; piso: number }
+  | { t: number; tipo: 'baja'; persona: number; piso: number }
+  /** Quien no cupo en P1 se va por las escaleras (al empezar a cerrar las puertas). */
+  | { t: number; tipo: 'escaleras'; persona: number }
+  /** El aseo termina en el sótano y su personal se va. */
+  | { t: number; tipo: 'aseoTermina' };
+
+export interface Traza {
+  personas: PersonaTraza[];
+  eventos: EventoTraza[];
+  /** Segundo en que termina la corrida (después de la franja se sigue hasta atender a todos). */
+  finS: number;
+}
+
+export function crearTraza(): Traza {
+  return { personas: [], eventos: [], finS: 0 };
+}

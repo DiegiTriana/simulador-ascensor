@@ -4,7 +4,7 @@
 import { PARAMETROS as P } from '../data/parametros.ts';
 import { generarEscenario, type OpcionesEscenario } from './llegadas.ts';
 import { crearRng } from './rng.ts';
-import type { Entradas, Escenario, Persona, Resultado, Vuelta } from './tipos.ts';
+import type { Entradas, EventoTraza, Escenario, Persona, Resultado, Traza, Vuelta } from './tipos.ts';
 
 const DS = 10;
 
@@ -42,11 +42,17 @@ export function simularEntradas(
   semilla: number,
   config: Config = CONFIG_DEFECTO,
   opciones: OpcionesEscenario = {},
+  traza?: Traza,
 ): Resultado {
-  return simular(generarEscenario(entradas, semilla, opciones), semilla, config);
+  return simular(generarEscenario(entradas, semilla, opciones), semilla, config, traza);
 }
 
-export function simular(escenario: Escenario, semilla: number, cfg: Config = CONFIG_DEFECTO): Resultado {
+/**
+ * Corre la simulación. Si se pasa `traza`, se llena con los hechos de la corrida (cabina, puertas, quién sube,
+ * baja o se va por las escaleras) para animarla. La traza solo anota: no usa el generador aleatorio ni cambia
+ * nada de lo que se calcula, así que el resultado es el mismo con o sin ella.
+ */
+export function simular(escenario: Escenario, semilla: number, cfg: Config = CONFIG_DEFECTO, traza?: Traza): Resultado {
   const T = escenario.duracionS;
   const rngEscaleras = crearRng((semilla ^ 0x9e3779b9) >>> 0);
   const personas: Persona[] = escenario.personas.map((p) => ({ ...p }));
@@ -63,11 +69,24 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
   let aseo: { fase: FaseAseo; hasta: number } | null = null;
   let aseoPendiente = 0;
   let aseoAtendidos = 0;
+  /** Décimas de segundo en que el personal de aseo bajó en el sótano (para la traza). */
+  let aseoBajoEn = 0;
   let abandonos = 0;
   let vueltaActual: Vuelta | null = null;
   let ultimaAperturaP1: Vuelta | null = null;
 
   const seg = () => ahora / DS;
+  const anotar = (e: EventoTraza) => {
+    traza?.eventos.push(e);
+  };
+  // Con las puertas abiertas se entra y se sale de a una persona, 2 s cada una (así se calcula cuánto quedan
+  // abiertas). Esto da el segundo de cada movimiento, solo para la traza.
+  let libreDesde = 0;
+  const inicioDeMovimiento = () => {
+    const inicio = Math.max(ahora, libreDesde);
+    libreDesde = inicio + cfg.dsPorPersona;
+    return inicio / DS;
+  };
   const libres = () => cfg.capacidad - ocupantes.reduce((s, p) => s + p.cupos, 0);
   const alguienCabe = (f: number) => {
     const l = libres();
@@ -83,10 +102,12 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
   const adelante = (f: number, d: number, reqs: number[]) => reqs.some((r) => (r - f) * d > 0);
 
   function mover() {
+    anotar({ t: seg(), tipo: 'mueve', desde: piso, hacia: piso + dir, llega: (ahora + cfg.dsPorPiso) / DS });
     modo = 'moviendo';
     timer = cfg.dsPorPiso;
   }
   function abrir() {
+    anotar({ t: seg(), tipo: 'abre', piso });
     modo = 'abriendo';
     timer = cfg.dsAbrir;
   }
@@ -95,6 +116,7 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
     if (aseo) {
       if (aseo.fase === 'ocupado') {
         if (ahora < aseo.hasta) return;
+        anotar({ t: Math.max(aseo.hasta, aseoBajoEn) / DS, tipo: 'aseoTermina' });
         aseo = null;
       } else if (aseo.fase === 'aP1') {
         if (piso === 1) abrir();
@@ -163,6 +185,7 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
         cola.splice(cola.indexOf(p), 1);
         p.abordo = seg();
         ocupantes.push(p);
+        anotar({ t: inicioDeMovimiento(), tipo: 'sube', persona: p.id, piso: f });
         subieron++;
       }
     }
@@ -176,12 +199,16 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
 
   /** Puertas totalmente abiertas: bajan y suben. */
   function intercambio() {
+    anotar({ t: seg(), tipo: 'abierta', piso });
+    libreDesde = ahora;
     let movimientos = 0;
     for (let i = ocupantes.length - 1; i >= 0; i--) {
       const p = ocupantes[i];
       if (p.destino === piso) {
         ocupantes.splice(i, 1);
         if (p.tipo !== 'aseo') p.bajo = seg();
+        anotar({ t: inicioDeMovimiento(), tipo: 'baja', persona: p.id, piso });
+        if (p.tipo === 'aseo') aseoBajoEn = ahora;
         movimientos++;
       }
     }
@@ -191,6 +218,7 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
           id: -1, tipo: 'aseo', cupos: 1, origen: 1, destino: 0, llegada: 0, inicial: false,
           enPico: false, abordo: null, bajo: null, seFue: false,
         });
+        anotar({ t: inicioDeMovimiento(), tipo: 'sube', persona: -1, piso: 1 });
         aseo = { fase: 'aS', hasta: ahora + cfg.dsAseo };
         aseoAtendidos++;
         movimientos++;
@@ -221,6 +249,7 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
 
   /** Al empezar a cerrar en P1, quien no cupo se va por las escaleras con 85 %. */
   function cerrar() {
+    anotar({ t: seg(), tipo: 'cierra', piso });
     if (piso === 1 && !aseo) {
       const noCupieron = colas[1].length;
       let rechazos = 0;
@@ -228,6 +257,7 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
         if (p.tipo === 'normal' && rngEscaleras() < cfg.probEscaleras) {
           colas[1].splice(colas[1].indexOf(p), 1);
           p.seFue = true;
+          anotar({ t: seg(), tipo: 'escaleras', persona: p.id });
           abandonos++;
           rechazos++;
         }
@@ -280,6 +310,7 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
           cerrar();
           break;
         case 'cerrando':
+          anotar({ t: seg(), tipo: 'cerrada', piso });
           modo = 'quieto';
           if (piso === 1) vueltaActual = null;
           break;
@@ -324,6 +355,14 @@ export function simular(escenario: Escenario, semilla: number, cfg: Config = CON
     if (t >= T && siguiente >= personas.length && colas.every((c) => c.length === 0) && ocupantes.length === 0) {
       if (modo === 'quieto' && !aseo) break;
     }
+  }
+
+  if (traza) {
+    traza.finS = ahora / DS;
+    traza.personas = personas.map((p) => ({
+      id: p.id, tipo: p.tipo, cupos: p.cupos, origen: p.origen, destino: p.destino, llegada: p.llegada,
+    }));
+    traza.personas.push({ id: -1, tipo: 'aseo', cupos: 1, origen: 1, destino: 0, llegada: 0 });
   }
 
   // --- Resultados ---
