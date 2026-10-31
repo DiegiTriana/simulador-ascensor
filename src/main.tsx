@@ -1,4 +1,10 @@
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { App } from './ui/App.tsx';
+import './ui/estilos.css';
 
-// La interfaz llega en la fase 3; por ahora solo comprueba que el proyecto compila.
-createRoot(document.getElementById('raiz')!).render(<p>Simulador del ascensor: fase 1 (sin interfaz).</p>);
+createRoot(document.getElementById('raiz')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>,
+);
