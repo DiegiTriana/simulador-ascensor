@@ -719,5 +719,5 @@ const NOMBRE_REPO = 'simulador-ascensor';
 
 Proyecto de la asignatura **Modelos Matemáticos** (código 13804), Universidad **UDES**.
 
-- Docente: Lorencita Rodriguez Galezo.
+- Docente: Lorencita Rodríguez Galezo.
 - Periodo académico: 2026-B.
