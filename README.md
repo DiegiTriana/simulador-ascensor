@@ -391,25 +391,7 @@ Con las reglas del documento tal cual, el abandono en los picos daba cerca de **
 - Quienes bajan se reparten en los 12,5 minutos posteriores a cada cambio de clase de la franja.
 - El aseo pide el ascensor repartido parejo en la franja y lo usa con la cabina vacía y sin llamadas; 150 s desde que abre en P1.
 - Después de terminar la franja la simulación sigue (hasta 1 hora) hasta atender a todos, pero las medidas de fila solo cuentan dentro de la franja.
-- **A. Grupos que suben al mismo piso (apagado).** En el edificio, quienes suben juntos suelen ir al mismo piso (1,6 pisos distintos por vuelta en los datos) y llegan juntos (el lunes, 7 personas a la vez). El documento ya lo menciona como limitación y **la simulación no lo activa**: cada persona llega y elige destino por separado. La opción existe en el código, apagada, y no se usa en los resultados.
-
-<details>
-<summary><strong>¿Qué pasaría con grupos? (exploración, no es un dato medido)</strong></summary>
-
-Para ver cuánto pesa esa limitación se corrió la simulación con grupos de varios tamaños (10 corridas, semillas 1 a 10, caso del miércoles). Esto **no está en la app**:
-
-| Tamaño medio del grupo | Se van por las escaleras en picos | μ (personas/min) | Fila promedio en picos | Vuelta saturada |
-|---|---|---|---|---|
-| 1 (lo que usa la app) | 20,7 % ± 2,4 | 3,38 ± 0,47 | 4,4 ± 0,5 | 165 s |
-| 3 | 18,2 % ± 2,2 | 3,97 ± 0,37 | 3,6 ± 0,5 | 152 s |
-| 5 | 20,9 % ± 2,2 | 4,10 ± 0,38 | 3,5 ± 0,5 | 145 s |
-| 7 | 25,3 % ± 2,3 | 3,88 ± 0,69 | 3,4 ± 0,8 | 160 s |
-
-Con grupos de 3 a 5, la vuelta y μ se acercan a las medidas (153 s y 3,9 por minuto). Es probable que los grupos expliquen por qué la vuelta simulada es más larga que la real.
-
-*Fuente: `npm run tabla -- 10`, sección «Sensibilidad a grupos».*
-
-</details>
+- **A. Grupos que suben al mismo piso (apagado).** En el edificio, quienes suben juntos suelen ir al mismo piso (1,6 pisos distintos por vuelta en los datos) y llegan juntos (el lunes, 7 personas a la vez). El documento ya lo menciona como limitación y **la simulación no lo activa**: cada persona llega y elige destino por separado.
 
 ---
 
@@ -419,7 +401,7 @@ Con grupos de 3 a 5, la vuelta y μ se acercan a las medidas (153 s y 3,9 por mi
 > **La validación es de un solo día de pico (el miércoles).** Es una guía, no una prueba definitiva.
 
 - **Solo se simulan tres flujos:** las personas que llegan a P1 para subir, las que bajan después de un cambio de clase y los usos del aseo, porque son los que se contaron en el estudio. Los **viajes entre pisos altos** y las personas que **se cansan de esperar y se van por las escaleras desde un piso alto** no se observaron, así que no se incluyen ni se inventan.
-- **Las personas llegan de una en una.** En el edificio suelen llegar en grupos que van al mismo piso; eso probablemente alarga la vuelta simulada (unos 165 s contra 153 s medidos).
+- **Las llegadas en grupo no se modelan**, y eso probablemente alarga la vuelta simulada.
 - **La forma de las vueltas no coincide una a una con la real.** La simulación satura más V1 y V2 (en promedio 6,9 y 9,2 rechazos contra 4 y 5 reales) y deja V4 casi vacía (0 contra 2). El total coincide, la secuencia no. La fila máxima simulada también es mayor (19,8 contra 16).
 - **μ medida y μ del documento.** La tabla usa la μ que mide la simulación, no los 3,9 del documento (ver [El modelo de clase](#el-modelo-de-clase-mm1k)).
 - **Los tiempos de los pisos altos no se usan como dato:** las horas anotadas se redondearon a 5 s. Las demoras sin paradas anotadas (de P6 a P8 hasta P1, de 105 a 155 s) se tratan como demoras no observadas.
@@ -643,7 +625,18 @@ La escena arma la traza en un índice una sola vez y, para cualquier segundo, ca
 
 La escena se carga **después** del formulario (`React.lazy`), así que el formulario no espera a three.js.
 
-**Cuadros por segundo en el navegador:** [PENDIENTE: valor medido en el navegador real, que no quedó anotado en el plan]. La prueba en un celular real (simular, las cuatro vistas, «Ver resultados», girar la pantalla) salió bien y la escena iba fluida.
+**Medido en el navegador** (Chrome con una GPU NVIDIA RTX 5050 y una pantalla de 144 Hz; versión de producción, con la corrida del miércoles a 10×):
+
+| Medida | Resultado |
+|---|---|
+| Cuadros por segundo | Unos 140 en las cuatro vistas, a 1366×768, 1920×1080 y 390×844 (cerca del tope de la pantalla de 144 Hz) |
+| Cuadro del percentil 95 | 10,1 ms o menos |
+| Primer dibujo 3D | De 0,7 a 1,2 s |
+| Modelos cargados | De 1,4 a 1,7 s |
+| Carga de la página | 22 peticiones y 1,07 MB, todas locales |
+| **Sin tarjeta gráfica** (el navegador dibuja por software) | De 15 a 27 cuadros por segundo, con la calidad adaptable activada |
+
+El tamaño de 390×844 fue **emulado** en el navegador del computador. Además, la app se probó en un **celular real** (simular, las cuatro vistas, «Ver resultados» y girar la pantalla) y salió bien.
 
 </details>
 
@@ -716,7 +709,7 @@ const NOMBRE_REPO = 'simulador-ascensor';
 - **Datos:** «Datos del ascensor y plan de simulación» (documento de la profesora) y los datos recolectados en el edificio.
 - **Hecho con** React, React Three Fiber, Drei, three.js, Zustand, Vite y Vitest.
 - **Sin peticiones externas:** al abrir la página, las fuentes y los modelos se sirven desde la propia página; no se pide nada a otros sitios.
-- **Licencia del código del proyecto:** [PENDIENTE: licencia del código, porque el repositorio todavía no tiene un archivo de licencia].
+- **Licencia del código del proyecto:** sin licencia de uso: © 2026 Diego Triana, **todos los derechos reservados**. El código se puede ver, pero no reutilizar sin permiso. Los modelos y la letra conservan las licencias de arriba.
 
 ---
 
@@ -724,7 +717,7 @@ const NOMBRE_REPO = 'simulador-ascensor';
 
 **Autor:** Diego Triana ([@DiegiTriana](https://github.com/DiegiTriana)).
 
-Proyecto de la asignatura **Modelos Matemáticos**, Universidad **UDES**.
+Proyecto de la asignatura **Modelos Matemáticos** (código 13804), Universidad **UDES**.
 
-- Docente: [PENDIENTE: nombre de la docente].
-- Periodo académico: [PENDIENTE: semestre y año].
+- Docente: Lorencita Rodriguez Galezo.
+- Periodo académico: 2026-B.
