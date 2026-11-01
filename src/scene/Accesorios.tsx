@@ -110,7 +110,18 @@ export function CarritoAseo() {
         <cylinderGeometry args={[0.2, 0.15, 0.32, 8]} />
         <meshStandardMaterial color={PALETA.amarillo} roughness={0.95} flatShading />
       </mesh>
-      <Caja posicion={[-0.2, 0.96, 1.0]} tam={[0.32, 0.3, 0.32]} color={PALETA.crema} radio={0.07} />
+      {/* Toallas dobladas sobre el cajón. */}
+      <Caja posicion={[-0.2, 0.86, 1.02]} tam={[0.36, 0.1, 0.3]} color={PALETA.verde} radio={0.04} />
+      {/* Bolsa de basura: un saco negro colgado del costado, con su nudo arriba y un gancho. */}
+      <Caja posicion={[0.4, 0.74, 1.0]} tam={[0.1, 0.05, 0.05]} color={PALETA.gris} radio={0.02} sombra={false} />
+      <mesh position={[0.58, 0.5, 1.0]} scale={[0.85, 1.05, 0.95]} castShadow>
+        <dodecahedronGeometry args={[0.24, 0]} />
+        <meshStandardMaterial color={PALETA.negro} roughness={0.95} flatShading />
+      </mesh>
+      <mesh position={[0.58, 0.78, 1.0]} castShadow>
+        <coneGeometry args={[0.07, 0.14, 6]} />
+        <meshStandardMaterial color={PALETA.negro} roughness={0.95} flatShading />
+      </mesh>
       <Caja posicion={[-0.3, 1.2, 1.4]} tam={[0.05, 1.05, 0.05]} color={PALETA.grisClaro} radio={0.02} sombra={false} />
       <Caja posicion={[-0.3, 1.78, 1.4]} tam={[0.34, 0.12, 0.16]} color={PALETA.rojo} radio={0.05} />
       {/* Ruedas */}

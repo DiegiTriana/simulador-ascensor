@@ -8,7 +8,7 @@
 
 import { PARAMETROS as P } from '../data/parametros.ts';
 import type { TipoPersona, Traza } from '../sim/tipos.ts';
-import { CELDAS_CABINA, asignarCeldas, desvio, lugarEnFila, puntoDeCeldas } from './disposicion.ts';
+import { CELDAS_CABINA, X_ASEO_ESPERA, asignarCeldas, desvio, lugarEnFila, puntoDeCeldas } from './disposicion.ts';
 import { CABINA, DECORACION, PARED_IZQUIERDA_Z, PISO_MAXIMO, TORRE, yPiso } from './medidas.ts';
 import type { CabinaVista, EstadoVista, PersonaVista } from './vista.ts';
 
@@ -24,8 +24,6 @@ export const ESCALERAS_S = 3.5;
 export const ASEO_ENTRADA_S = 3;
 /** Lo que tarda quien está en una fila en dar el paso adelante cuando alguien de adelante se va. */
 export const PASO_FILA_S = 1;
-/** El personal de aseo llega al vestíbulo de P1 un rato antes de subir. */
-export const ANTELACION_ASEO_S = 2.5;
 /** Metros de escena por ciclo completo del paso. */
 const ZANCADA = 0.9;
 const ENTRADA_X = -4;
@@ -71,16 +69,13 @@ interface Cambio {
   cupos: number;
 }
 interface FilaPiso {
-  /** Todas las que pasan por este piso, por orden de llegada. */
+  /** Todas las que pasan por este piso, por orden de llegada (sin el personal de aseo, que espera aparte). */
   personas: DatosPersona[];
   llegadas: Float64Array;
   salidas: Float64Array;
   /** Máximo de `salidas` hasta cada posición (no decrece: sirve para buscar con búsqueda binaria). */
   maximoSalida: Float64Array;
   salidasOrdenadas: Float64Array;
-  /** Para contar la fila sin el personal de aseo. */
-  llegadasContadas: Float64Array;
-  salidasContadas: Float64Array;
 }
 
 export interface Indice {
@@ -99,6 +94,7 @@ export interface Indice {
   tiemposBajas: Float64Array;
   escaleras: DatosPersona[];
   tiemposEscaleras: Float64Array;
+  /** Cada viaje del aseo; `llegada` es cuando pidió el ascensor y se paró frente a la puerta de P1. */
   usosAseo: DatosPersona[];
 }
 
@@ -130,6 +126,26 @@ function datos(p: Traza['personas'][number]): DatosPersona {
 }
 
 const ordenados = (xs: number[]) => Float64Array.from(xs).sort();
+
+/**
+ * Segundo en que el aseo pidió el ascensor: cuando la cabina empezó a venir a P1 o, si ya estaba ahí, cuando abrió. La
+ * simulación solo se lo da con la cabina vacía y sin llamadas, así que a esa hora la fila de P1 está vacía y el
+ * personal de aseo es el primero frente a la puerta.
+ */
+function pedidoDelAseo(movimientos: readonly Movimiento[], puertas: readonly EventoPuerta[], tSube: number): number {
+  let k = puertas.length - 1;
+  while (k >= 0 && !(puertas[k].tipo === 'abre' && puertas[k].t <= tSube)) k--;
+  if (k < 0) return Math.max(0, tSube);
+  const tAbre = puertas[k].t;
+  const tPuertaAntes = k > 0 ? puertas[k - 1].t : 0;
+  let j = movimientos.length - 1;
+  while (j >= 0 && movimientos[j].t > tAbre) j--;
+  // Si la cabina no llegó a P1 justo antes de abrir, ya estaba ahí.
+  if (j < 0 || Math.abs(movimientos[j].llega - tAbre) > 0.25) return tAbre;
+  // Los viajes seguidos (uno por piso) son un solo viaje, sin pasar de la última puerta.
+  while (j > 0 && Math.abs(movimientos[j - 1].llega - movimientos[j].t) < 0.25 && movimientos[j - 1].t >= tPuertaAntes) j--;
+  return Math.max(tPuertaAntes, movimientos[j].t);
+}
 
 export function construirIndice(traza: Traza): Indice {
   const normales = new Map<number, DatosPersona>();
@@ -167,7 +183,8 @@ export function construirIndice(traza: Traza): Indice {
         let d = normales.get(e.persona);
         if (e.persona === -1) {
           // Cada uso del ascensor por el aseo es una persona aparte, para no confundir un viaje con otro.
-          d = datos({ id: -(usosAseo.length + 1), tipo: 'aseo', cupos: 1, origen: 1, destino: 0, llegada: Math.max(0, e.t - ANTELACION_ASEO_S) });
+          const pidio = pedidoDelAseo(movimientos, puertas, e.t);
+          d = datos({ id: -(usosAseo.length + 1), tipo: 'aseo', cupos: 1, origen: 1, destino: 0, llegada: pidio });
           usosAseo.push(d);
           todas.push(d);
           usoABordo = d;
@@ -209,10 +226,10 @@ export function construirIndice(traza: Traza): Indice {
 
   const filas: FilaPiso[] = Array.from({ length: PISO_MAXIMO + 1 }, (): FilaPiso => ({
     personas: [], llegadas: new Float64Array(0), salidas: new Float64Array(0), maximoSalida: new Float64Array(0),
-    salidasOrdenadas: new Float64Array(0), llegadasContadas: new Float64Array(0), salidasContadas: new Float64Array(0),
+    salidasOrdenadas: new Float64Array(0),
   }));
   const porPiso: DatosPersona[][] = filas.map(() => []);
-  for (const d of todas) if (d.origen >= 0 && d.origen <= PISO_MAXIMO) porPiso[d.origen].push(d);
+  for (const d of todas) if (!d.aseo && d.origen >= 0 && d.origen <= PISO_MAXIMO) porPiso[d.origen].push(d);
   porPiso.forEach((lista, piso) => {
     lista.sort((a, b) => a.llegada - b.llegada || a.id - b.id);
     const f = filas[piso];
@@ -227,9 +244,6 @@ export function construirIndice(traza: Traza): Indice {
     }
     f.maximoSalida = maximo;
     f.salidasOrdenadas = ordenados(lista.map((p) => p.salidaFila).filter(Number.isFinite));
-    const contadas = lista.filter((p) => !p.aseo);
-    f.llegadasContadas = ordenados(contadas.map((p) => p.llegada));
-    f.salidasContadas = ordenados(contadas.map((p) => p.salidaFila).filter(Number.isFinite));
   });
 
   const bajas = todas.filter((p) => p.tBaja !== null).sort((a, b) => (a.tBaja as number) - (b.tBaja as number));
@@ -360,9 +374,9 @@ function ventana(f: FilaPiso, t: number, max: number): DatosPersona[] {
   return res;
 }
 
-/** Personas en la fila de un piso en el segundo t (sin el personal de aseo). */
+/** Personas en la fila de un piso en el segundo t. */
 function esperandoEn(f: FilaPiso, t: number): number {
-  return hasta(f.llegadasContadas, t) - hasta(f.salidasContadas, t);
+  return hasta(f.llegadas, t) - hasta(f.salidasOrdenadas, t);
 }
 
 /** Último segundo ≤ t en que alguien dejó la fila de este piso (−Infinity si nadie). */
@@ -371,34 +385,70 @@ function ultimaSalida(f: FilaPiso, t: number): number {
   return k === 0 ? -Infinity : f.salidasOrdenadas[k - 1];
 }
 
-function poseFila(p: DatosPersona, rango: number, rangoAntes: number | undefined, ultima: number, t: number): PersonaVista {
+/** El personal de aseo que espera frente a la puerta de P1 en el segundo t (null si nadie). */
+function aseoEsperando(ix: Indice, t: number): DatosPersona | null {
+  for (const q of ix.usosAseo) if (q.llegada <= t && t < (q.tSube as number) + EMBARQUE_S) return q;
+  return null;
+}
+
+/** Último segundo ≤ t en que el carrito del aseo apareció o dejó libre su lugar en la fila de P1 (−Infinity si nunca). */
+function ultimoCambioDelCarrito(ix: Indice, t: number): number {
+  let ultimo = -Infinity;
+  for (const q of ix.usosAseo) {
+    for (const cambio of [q.llegada, (q.tSube as number) + EMBARQUE_S]) if (cambio <= t && cambio > ultimo) ultimo = cambio;
+  }
+  return ultimo;
+}
+
+/** Cómo está armada la fila de un piso en un segundo: si el carrito del aseo espera frente a la puerta (solo en P1). */
+const hayCarrito = (ix: Indice, piso: number, t: number) => piso === 1 && aseoEsperando(ix, t) !== null;
+
+function poseFila(
+  p: DatosPersona,
+  rango: number,
+  rangoAntes: number | undefined,
+  ultima: number,
+  t: number,
+  conCarrito: boolean,
+  conCarritoAntes: boolean,
+): PersonaVista {
   const y = yPiso(p.origen);
-  const destino = lugarEnFila(rango, p.id);
+  const destino = lugarEnFila(rango, p.id, conCarrito);
   const desdeLlegar = t - p.llegada;
   if (desdeLlegar < LLEGADA_S) {
     return andando(p, y, [puntoEntrada(p), [destino.x, destino.z]], desdeLlegar / LLEGADA_S, destino.giro);
   }
-  if (rangoAntes !== undefined && rangoAntes !== rango) {
+  if (rangoAntes !== undefined && (rangoAntes !== rango || conCarritoAntes !== conCarrito)) {
     const s = (t - ultima) / PASO_FILA_S;
     if (s < 1) {
-      const origen = lugarEnFila(rangoAntes, p.id);
+      const origen = lugarEnFila(rangoAntes, p.id, conCarritoAntes);
       return andando(p, y, [[origen.x, origen.z], [destino.x, destino.z]], s, destino.giro);
     }
   }
   return quieto(p, destino.x, y, destino.z, destino.giro);
 }
 
+/** Dónde espera el personal de aseo (mira a la puerta, con el carrito delante). */
+const lugarDeEsperaDelAseo: Punto = [X_ASEO_ESPERA, TORRE.zc];
+
 /**
  * Dónde está una persona en la fila en un segundo dado. Si no está entre las primeras MAX_POR_PISO (no se dibujaba),
  * devuelve null, salvo que `aunSinVerse` pida ponerla al final de las que se ven (quien sube a la cabina desde atrás).
  */
 function poseFilaEn(ix: Indice, p: DatosPersona, t: number, aunSinVerse: boolean): PersonaVista | null {
+  if (p.aseo) {
+    return quieto(p, lugarDeEsperaDelAseo[0], yPiso(1), lugarDeEsperaDelAseo[1], Math.PI / 2);
+  }
   const f = ix.filas[p.origen];
   const ahora = ventana(f, t, MAX_POR_PISO);
   const lugar = ahora.findIndex((q) => q.id === p.id);
   if (lugar < 0 && !aunSinVerse) return null;
   const antes = ventana(f, t - PASO_FILA_S, MAX_POR_PISO).findIndex((q) => q.id === p.id);
-  return poseFila(p, lugar < 0 ? MAX_POR_PISO : lugar, antes < 0 ? undefined : antes, ultimaSalida(f, t), t);
+  const ultima = Math.max(ultimaSalida(f, t), p.origen === 1 ? ultimoCambioDelCarrito(ix, t) : -Infinity);
+  return poseFila(
+    p, lugar < 0 ? MAX_POR_PISO : lugar, antes < 0 ? undefined : antes, ultima, t,
+    hayCarrito(ix, p.origen, t), hayCarrito(ix, p.origen, t - PASO_FILA_S),
+  );
 }
 
 // ---------------------------------------------------------------- estado en un segundo
@@ -424,8 +474,23 @@ export function estadoEn(ix: Indice, t: number): EstadoVista {
     const ahora = ventana(f, t, MAX_POR_PISO);
     if (ahora.length === 0) continue;
     const antes = new Map(ventana(f, t - PASO_FILA_S, MAX_POR_PISO).map((p, i) => [p.id, i]));
-    const ultima = ultimaSalida(f, t);
-    ahora.forEach((p, rango) => personas.push(poseFila(p, rango, antes.get(p.id), ultima, t)));
+    const ultima = Math.max(ultimaSalida(f, t), piso === 1 ? ultimoCambioDelCarrito(ix, t) : -Infinity);
+    const conCarrito = hayCarrito(ix, piso, t);
+    const conCarritoAntes = hayCarrito(ix, piso, t - PASO_FILA_S);
+    ahora.forEach((p, rango) => personas.push(poseFila(p, rango, antes.get(p.id), ultima, t, conCarrito, conCarritoAntes)));
+  }
+
+  // 1b. El personal de aseo, antes de subir: entra al vestíbulo de P1 y espera frente a la puerta, con su carrito, a
+  // que la cabina esté libre. La fila se arma a su alrededor (ver `lugarEnFila`), así el carrito no pasa por nadie.
+  const esperaAseo = aseoEsperando(ix, t);
+  if (esperaAseo && t < (esperaAseo.tSube as number)) {
+    const u = (t - esperaAseo.llegada) / LLEGADA_S;
+    const y = yPiso(1);
+    personas.push(
+      u < 1
+        ? andando(esperaAseo, y, [puntoEntrada(esperaAseo), lugarDeEsperaDelAseo], u, Math.PI / 2)
+        : quieto(esperaAseo, lugarDeEsperaDelAseo[0], y, lugarDeEsperaDelAseo[1], Math.PI / 2),
+    );
   }
 
   // 2. Quienes van a bordo: entrando (a pie hasta su lugar) o ya en su lugar.

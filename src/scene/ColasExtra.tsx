@@ -3,21 +3,29 @@
 
 import { useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
-import { CanvasTexture, SRGBColorSpace, type Sprite, type SpriteMaterial } from 'three';
+import { CanvasTexture, SRGBColorSpace, type Group, type Sprite, type SpriteMaterial } from 'three';
 import type { Manejadores } from './manejadores.ts';
-import { TORRE, PISO_MAXIMO, yPiso } from './medidas.ts';
+import { ALTURA_PISO, GROSOR_LOSA, TORRE, PISO_MAXIMO, yPiso } from './medidas.ts';
 import { PALETA } from './paleta.ts';
 import { dibujarRotulo, fuentesListas, type OpcionesRotulo } from './rotulos.ts';
 
 const PISOS = Array.from({ length: PISO_MAXIMO + 1 }, (_, i) => i);
-const ANCHO = 2.1;
+const ANCHO = 2;
 const OPCIONES: OpcionesRotulo = { fondo: PALETA.amarillo, tinta: PALETA.negro, ancho: 384, alto: 112, radio: 30 };
+const ALTO = (ANCHO * OPCIONES.alto) / OPCIONES.ancho;
+/** Sobre las últimas hileras, del lado del vidrio del frente, por encima de las cabezas y bajo el indicador. */
+const X_CARTEL = TORRE.x0 + 1.1;
+const Z_CARTEL = TORRE.zc + 1.25;
+/** Borde de arriba del cartel y techo del piso (cara de abajo de la losa de arriba), sobre el piso terminado. */
+const Y_CARTEL = 1.95;
+const Y_TECHO_PISO = ALTURA_PISO - GROSOR_LOSA;
 
 export const textoDeExtras = (n: number): string => (n === 1 ? '+1 persona' : `+${n} personas`);
 
 export function ColasExtra({ manejadores }: { manejadores: Manejadores }) {
   const invalidar = useThree((s) => s.invalidate);
   const sprites = useRef<(Sprite | null)[]>([]);
+  const carteles = useRef<(Group | null)[]>([]);
 
   useEffect(() => {
     let vivo = true;
@@ -26,7 +34,8 @@ export function ColasExtra({ manejadores }: { manejadores: Manejadores }) {
       if (!vivo) return;
       PISOS.forEach((piso) => {
         const sprite = sprites.current[piso];
-        if (!sprite) return;
+        const cartel = carteles.current[piso];
+        if (!sprite || !cartel) return;
         const canvas = document.createElement('canvas');
         const textura = new CanvasTexture(canvas);
         textura.colorSpace = SRGBColorSpace;
@@ -37,7 +46,7 @@ export function ColasExtra({ manejadores }: { manejadores: Manejadores }) {
           poner(n: number) {
             if (n === ultimo) return;
             ultimo = n;
-            sprite.visible = n > 0;
+            cartel.visible = n > 0;
             if (n > 0) {
               dibujarRotulo(canvas, textoDeExtras(n), OPCIONES);
               textura.needsUpdate = true;
@@ -56,20 +65,27 @@ export function ColasExtra({ manejadores }: { manejadores: Manejadores }) {
     };
   }, [manejadores, invalidar]);
 
+  // Cartel colgado del techo a un lado del vestíbulo, sobre el final de la fila: opaco (no deja ver nada a través) y
+  // fuera del eje de la puerta, para no tapar el indicador de piso. El alto de las personas es 1,2.
   return (
     <group>
       {PISOS.map((piso) => (
-        <sprite
+        <group
           key={piso}
           visible={false}
-          position={[TORRE.x0 + 1.2, yPiso(piso) + 1.75, TORRE.zc]}
-          scale={[ANCHO, (ANCHO * OPCIONES.alto) / OPCIONES.ancho, 1]}
-          ref={(s) => {
-            sprites.current[piso] = s;
+          position={[X_CARTEL, yPiso(piso), Z_CARTEL]}
+          ref={(g) => {
+            carteles.current[piso] = g;
           }}
         >
-          <spriteMaterial transparent depthWrite={false} toneMapped={false} />
-        </sprite>
+          <mesh position={[0, (Y_CARTEL + Y_TECHO_PISO) / 2, 0]}>
+            <boxGeometry args={[0.07, Y_TECHO_PISO - Y_CARTEL, 0.07]} />
+            <meshStandardMaterial color={PALETA.gris} roughness={0.95} />
+          </mesh>
+          <sprite position={[0, Y_CARTEL - ALTO / 2, 0]} scale={[ANCHO, ALTO, 1]} ref={(s) => { sprites.current[piso] = s; }}>
+            <spriteMaterial alphaTest={0.5} toneMapped={false} />
+          </sprite>
+        </group>
       ))}
     </group>
   );

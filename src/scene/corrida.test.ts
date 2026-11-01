@@ -17,7 +17,7 @@ import {
   formatoReloj,
   indicadoresEn,
 } from './corrida.ts';
-import { lugarEnFila } from './disposicion.ts';
+import { X_ASEO_ESPERA, lugarEnFila } from './disposicion.ts';
 import { CABINA, PISO_MAXIMO, TORRE, yPiso } from './medidas.ts';
 import type { EstadoVista, PersonaVista } from './vista.ts';
 
@@ -335,6 +335,59 @@ describe('el aseo', () => {
     const c = cabinaEn(ix, baja.t + 0.1);
     expect(c.piso).toBe(0);
     expect(c.puertas).toBe(1);
+  });
+});
+
+describe('el carrito del aseo espera frente a la puerta y no pasa por nadie', () => {
+  // Una vuelta a P5 y, con la cabina arriba y sin llamadas, el aseo la pide; mientras viene, llega gente a P1.
+  const idas = [persona(0, 0, 5), persona(1, 0.5, 5)];
+  const llegan = Array.from({ length: 14 }, (_, i) => persona(10 + i, 46 + i * 2.5, 6));
+  const traza = trazaDe(escenario([...idas, ...llegan], { solicitudesAseo: [30] }), 0);
+  const ix = construirIndice(traza);
+  const sube = traza.eventos.find((e) => e.tipo === 'sube' && e.persona === -1)!;
+  const uso = ix.usosAseo[0];
+  const aseo = (t: number) => estadoEn(ix, t).personas.find((p) => p.tipo === 'aseo');
+
+  it('pide el ascensor antes de que abran las puertas y llega a esperar frente a ellas', () => {
+    expect(uso.llegada).toBeLessThan(sube.t - 5);
+    expect(aseo(uso.llegada - 0.1)).toBeUndefined();
+    const espera = aseo(uso.llegada + LLEGADA_S + 0.5)!;
+    expect(espera).toMatchObject({ x: X_ASEO_ESPERA, z: TORRE.zc, y: yPiso(1), caminando: false });
+    expect(aseo(sube.t - 0.1)).toMatchObject({ x: X_ASEO_ESPERA, caminando: false });
+  });
+
+  it('en esa espera sí llega gente a la fila (para que la prueba valga)', () => {
+    const enFila = (t: number) => estadoEn(ix, t).personas.filter((p) => p.tipo !== 'aseo' && p.y === yPiso(1) && p.x > 0.3 && p.x < TORRE.xPuertas);
+    expect(Math.max(...muestras(sube.t, 60).map((t) => enFila(t).length))).toBeGreaterThanOrEqual(4);
+  });
+
+  it('nadie queda dentro del carrito, ni de pie ni caminando, desde que llega hasta que entra a la cabina', () => {
+    const inicio = uso.llegada + LLEGADA_S;
+    const fin = (uso.tSube as number) + EMBARQUE_S;
+    for (let t = inicio; t < fin; t += 0.1) {
+      const v = estadoEn(ix, t);
+      const a = v.personas.find((p) => p.tipo === 'aseo');
+      if (!a || a.x > TORRE.xPuertas - 0.1) continue;
+      const [adelante, lado] = [Math.sin(a.giro), Math.cos(a.giro)];
+      for (const q of v.personas) {
+        if (q.id === a.id || Math.abs(q.y - a.y) > 0.5 || q.x < 0.3) continue;
+        const dx = q.x - a.x;
+        const dz = q.z - a.z;
+        const largo = dx * adelante + dz * lado;
+        const ancho = dx * lado - dz * adelante;
+        // El carrito sale de 0,4 a 1,6 delante de quien lo empuja y mide 0,86 de ancho; la persona, 0,3 de radio.
+        const dentro = largo > 0.4 - 0.3 && largo < 1.6 + 0.3 && Math.abs(ancho) < 0.43 + 0.3;
+        expect(dentro, `t=${t.toFixed(1)} persona ${q.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('al subir el aseo, la fila avanza hacia la puerta sin atropellarlo', () => {
+    const despues = (uso.tSube as number) + EMBARQUE_S + PASO_FILA_S + 0.1;
+    const v = estadoEn(ix, despues);
+    const primeras = v.personas.filter((p) => p.tipo !== 'aseo' && p.y === yPiso(1) && p.x > 0.3 && !p.caminando);
+    expect(primeras.length).toBeGreaterThan(0);
+    expect(primeras.some((p) => Math.abs(p.x - lugarEnFila(0, p.id).x) < 0.1)).toBe(true);
   });
 });
 

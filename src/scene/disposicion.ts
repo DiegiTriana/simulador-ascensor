@@ -27,10 +27,23 @@ export function desvio(id: number, semilla = 0): number {
   return (n % 1000) / 1000 - 0.5;
 }
 
-/** Lugar en la fila de un vestíbulo: el 0 es el primero frente a la puerta; se llena de a tres por hilera. */
-export function lugarEnFila(indice: number, id = indice): Lugar {
-  const hilera = Math.floor(indice / 3);
-  const columna = COLUMNAS_FILA[indice % 3];
+/**
+ * Dónde espera el personal de aseo con su carrito (de 1,5 de largo, que va delante de quien lo empuja): en la
+ * columna del centro, con la punta del carrito a un palmo de la pared de las puertas.
+ */
+export const X_ASEO_ESPERA = TORRE.xPuertas - 1.7;
+/** Hileras del centro que ocupa el carrito mientras espera (la 0 y la 1); nadie más se para ahí. */
+const CELDAS_DEL_CARRITO = [0, 3];
+
+/**
+ * Lugar en la fila de un vestíbulo: el 0 es el primero frente a la puerta; se llena de a tres por hilera. Con
+ * `conAseo` el carrito espera frente a la puerta: la fila se arma a su alrededor, sin usar esas celdas.
+ */
+export function lugarEnFila(indice: number, id = indice, conAseo = false): Lugar {
+  let celda = indice;
+  if (conAseo) for (const ocupada of CELDAS_DEL_CARRITO) if (celda >= ocupada) celda++;
+  const hilera = Math.floor(celda / 3);
+  const columna = COLUMNAS_FILA[celda % 3];
   return {
     x: X_PRIMERA_FILA - hilera * PASO_FONDO_FILA + desvio(id, 1) * 0.14,
     z: TORRE.zc + columna * PASO_ANCHO_FILA + desvio(id, 2) * 0.16,
