@@ -1532,6 +1532,26 @@ sub {
   }
 }
 
+/* Pasar el puntero por encima: solo donde hay puntero fino; el pulsado y el foco siguen como estaban. */
+@media (hover: hover) {
+  .boton:not(.boton-simular):hover:not(:disabled),
+  .boton-ayuda:hover,
+  .boton-cuadrado:hover,
+  .mas:hover,
+  .reproductor-boton:hover,
+  .ver-resultados:hover,
+  .escena-barra button:hover:not(:disabled):not([aria-pressed='true']) {
+    background: var(--pista);
+    border-color: var(--tinta-2);
+  }
+  .boton-simular:hover:not([aria-disabled='true']) {
+    background: var(--acento-os);
+  }
+  .avanzado summary:hover {
+    text-decoration: underline;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

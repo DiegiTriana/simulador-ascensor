@@ -154,6 +154,13 @@ export function Ayuda({ seccion, alCerrar }: Props) {
         </section>
 
         <section>
+          <h3>Lo que la simulación no cubre</h3>
+          <p>
+            Solo se simulan tres flujos: las personas que llegan a P1 para subir, las que bajan después de un cambio de clase y los usos del aseo, porque son los que se contaron en el estudio. Los viajes entre pisos altos y las personas que se cansan de esperar y se van por las escaleras desde un piso alto no se observaron, así que no se incluyen ni se inventan.
+          </p>
+        </section>
+
+        <section>
           <h3>Créditos</h3>
           <ul>
             <li>Letra: Atkinson Hyperlegible, del Braille Institute of America (licencia SIL Open Font License 1.1).</li>

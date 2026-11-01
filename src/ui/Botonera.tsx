@@ -297,7 +297,7 @@ export function Botonera() {
           campo="llegadasP1"
           icono="suben"
           etiqueta="Llegan a P1 para subir"
-          ayuda="Personas que llegan a la planta baja y quieren subir. Ej.: 119 en 50 min el miércoles."
+          ayuda="Personas que llegan a la planta baja y quieren subir. Ej.: 119 en 50 min el miércoles."
         />
         <FilaConteo campo="bajan" icono="bajan" etiqueta="Bajan" ayuda="Personas que bajan en el ascensor hacia P1, P2 o P3. Ej.: 19." />
       </Paso>
@@ -321,7 +321,7 @@ export function Botonera() {
           campo="usosAseo"
           icono="aseo"
           etiqueta="Usos del aseo"
-          ayuda="Veces que el personal de aseo usa el ascensor con su carrito; lo deja ocupado 2 min 30 s. Ej.: 1."
+          ayuda="Veces que el personal de aseo usa el ascensor con su carrito; lo deja ocupado 2 min 30 s. Ej.: 1."
         />
       </Paso>
 
