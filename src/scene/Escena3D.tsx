@@ -3,9 +3,13 @@
 
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Plane, Vector3 } from 'three';
 import type { TipoPersona } from '../sim/tipos.ts';
 import { useAnimacion } from '../store/animacion.ts';
+import { useCalidad } from '../store/calidad.ts';
 import { useEscena } from '../store/escena.ts';
+import { CalidadAdaptable } from './CalidadAdaptable.tsx';
+import { NIVELES } from './calidad.ts';
 import { Camara } from './Camara.tsx';
 import { ColasExtra } from './ColasExtra.tsx';
 import { estadoEn } from './corrida.ts';
@@ -16,7 +20,7 @@ import { Pasillo } from './Pasillo.tsx';
 import { Persona3D } from './Persona3D.tsx';
 import { Torre } from './Torre.tsx';
 import { aVista, type EstadoVista } from './vista.ts';
-import { poseExterior } from './vistas.ts';
+import { alturaDeCorte, poseExterior } from './vistas.ts';
 
 const consulta = '(prefers-reduced-motion: reduce)';
 function suscribir(aviso: () => void) {
@@ -44,6 +48,7 @@ export default function Escena3D({ alPerderContexto }: Props) {
   const encuadre = useEscena((s) => s.encuadre);
   const orden = useEscena((s) => s.orden);
   const sinMovimiento = useSinMovimiento();
+  const calidad = NIVELES[useCalidad((s) => s.nivel)];
   const manejadores = useMemo<Manejadores>(crearManejadores, []);
   const muestra = useMemo(
     () => aVista(import.meta.env.DEV ? estadoDePruebaConParametros(window.location.search) : estadoDePrueba()),
@@ -52,8 +57,8 @@ export default function Escena3D({ alPerderContexto }: Props) {
   const pose = poseExterior(1.3);
   return (
     <Canvas
-      dpr={[1, 2]}
-      shadows="percentage"
+      dpr={[Math.min(1, calidad.dprMax), calidad.dprMax]}
+      shadows={calidad.sombras ? 'percentage' : false}
       flat
       frameloop="demand"
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
@@ -65,27 +70,37 @@ export default function Escena3D({ alPerderContexto }: Props) {
         });
       }}
     >
-      <Luces />
-      <Edificio />
+      <Luces sombras={calidad.sombras} />
+      {/* En la planta el bloque de ladrillo no se dibuja: el corte mostraría su interior hueco. */}
+      <group visible={vista !== 'planta'}>
+        <Edificio />
+      </group>
       <Torre manejadores={manejadores} />
       <Poblacion manejadores={manejadores} />
       <ColasExtra manejadores={manejadores} />
       <Animador manejadores={manejadores} muestra={muestra} />
-      {vista === 'piso' && <Pasillo piso={piso} />}
+      {(vista === 'piso' || vista === 'planta') && <Pasillo piso={piso} />}
+      <CorteDePlanta activo={vista === 'planta'} piso={piso} />
+      <CalidadAdaptable />
       <Camara vista={vista} piso={piso} encuadre={encuadre} orden={orden} sinMovimiento={sinMovimiento} />
     </Canvas>
   );
 }
 
-function Luces() {
+/**
+ * Luz de día: cielo y suelo (ambiente) y un sol que proyecta sombras suaves (con radio, no de borde duro). Sin
+ * sombras se compensa un poco con más ambiente para que la escena no se vea más oscura.
+ */
+function Luces({ sombras }: { sombras: boolean }) {
   return (
     <>
-      <hemisphereLight args={['#D0E8FF', '#F2BF99', 1.25]} />
+      <hemisphereLight args={['#D0E8FF', '#F2BF99', sombras ? 1.25 : 1.45]} />
       <directionalLight
         position={[22, 32, 28]}
         intensity={2.3}
         color="#FFF1DC"
-        castShadow
+        castShadow={sombras}
+        shadow-radius={3}
         shadow-mapSize={[2048, 2048]}
         shadow-camera-left={-32}
         shadow-camera-right={32}
@@ -98,6 +113,27 @@ function Luces() {
       />
     </>
   );
+}
+
+/**
+ * La planta es un corte del piso a la altura de las cabezas: todo lo que está más arriba (techos, losas, la parte
+ * alta de las paredes) se recorta con un plano de corte. Fuera de la planta no hay plano.
+ */
+function CorteDePlanta({ activo, piso }: { activo: boolean; piso: number }) {
+  const gl = useThree((s) => s.gl);
+  const invalidar = useThree((s) => s.invalidate);
+  const plano = useMemo(() => new Plane(new Vector3(0, -1, 0), 0), []);
+  useEffect(() => {
+    if (!activo) return;
+    plano.constant = alturaDeCorte(piso);
+    gl.clippingPlanes = [plano];
+    invalidar();
+    return () => {
+      gl.clippingPlanes = [];
+      invalidar();
+    };
+  }, [activo, piso, gl, plano, invalidar]);
+  return null;
 }
 
 /** Las personas que se dibujan ahora. Solo se vuelve a dibujar cuando cambia quién está, no en cada cuadro. */

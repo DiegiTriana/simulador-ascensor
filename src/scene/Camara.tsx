@@ -6,9 +6,10 @@ import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { MathUtils, PerspectiveCamera, TOUCH, Vector3 } from 'three';
-import { limitesExterior, poseDe, poseDePrueba, type Encuadre, type Pose, type Vista } from './vistas.ts';
+import { limitesExterior, poseDe, poseDePrueba, VISTAS_CON_PISO, type Encuadre, type Pose, type Vista } from './vistas.ts';
 
 const DURACION_S = 0.8;
+const ARRIBA: [number, number, number] = [0, 1, 0];
 const suave = (t: number) => t * t * (3 - 2 * t);
 
 interface Props {
@@ -32,6 +33,7 @@ function poseActual(camara: PerspectiveCamera, objetivo: Vector3): Pose {
     posicion: [camara.position.x, camara.position.y, camara.position.z],
     objetivo: [objetivo.x, objetivo.y, objetivo.z],
     fov: camara.fov,
+    arriba: [camara.up.x, camara.up.y, camara.up.z],
   };
 }
 
@@ -52,6 +54,7 @@ export function Camara({ vista, piso, encuadre, orden, sinMovimiento }: Props) {
     camara.position.set(...pose.posicion);
     objetivo.current.set(...pose.objetivo);
     camara.fov = pose.fov;
+    camara.up.set(...(pose.arriba ?? ARRIBA));
     camara.updateProjectionMatrix();
     controles.current?.target.copy(objetivo.current);
     camara.lookAt(objetivo.current);
@@ -84,7 +87,7 @@ export function Camara({ vista, piso, encuadre, orden, sinMovimiento }: Props) {
       return;
     }
     // Otro piso, o el lienzo cambió de forma: recolocar, sin deslizar. En la exterior solo si nadie movió la cámara.
-    if (vista === 'piso' || !tocada.current) {
+    if (VISTAS_CON_PISO.includes(vista) || vista === 'completo' || !tocada.current) {
       deslizando.current = null;
       colocar(destino);
     }
@@ -101,6 +104,7 @@ export function Camara({ vista, piso, encuadre, orden, sinMovimiento }: Props) {
     camara.position.copy(mezcla(d.desde.posicion, d.hacia.posicion));
     objetivo.current.copy(mezcla(d.desde.objetivo, d.hacia.objetivo));
     camara.fov = MathUtils.lerp(d.desde.fov, d.hacia.fov, k);
+    camara.up.copy(mezcla(d.desde.arriba ?? ARRIBA, d.hacia.arriba ?? ARRIBA)).normalize();
     camara.updateProjectionMatrix();
     controles.current?.target.copy(objetivo.current);
     camara.lookAt(objetivo.current);

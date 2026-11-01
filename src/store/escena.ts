@@ -1,4 +1,4 @@
-// Vista de la escena (exterior o desde un piso) y piso elegido. Es solo de la interfaz: cambiar de vista no
+// Vista de la escena (exterior, desde un piso, edificio completo o planta) y piso elegido. Es solo de la interfaz: cambiar de vista no
 // pausa ni reinicia nada de la simulación.
 
 import { create } from 'zustand';
@@ -11,7 +11,7 @@ export const limitarPiso = (piso: number): number => Math.min(PISO_MAXIMO, Math.
 
 interface EscenaStore {
   vista: Vista;
-  /** Piso de la vista desde un piso: 1..9. */
+  /** Piso de las vistas desde un piso y planta: 1..9. */
   piso: number;
   /** Encuadre de la vista exterior: todo el edificio o el pie de la torre. */
   encuadre: Encuadre;
@@ -24,13 +24,15 @@ interface EscenaStore {
   verLaFila: () => void;
 }
 
-/** Solo en desarrollo: ?vista=piso&piso=4 abre la escena ya en esa vista. */
+const VISTAS: readonly Vista[] = ['exterior', 'piso', 'completo', 'planta'];
+
+/** Solo en desarrollo: ?vista=piso&piso=4 (o completo, planta) abre la escena ya en esa vista. */
 function inicial(busqueda: string): Pick<EscenaStore, 'vista' | 'piso'> {
   if (!import.meta.env.DEV) return { vista: 'exterior', piso: PISO_INICIAL };
   const q = new URLSearchParams(busqueda);
   const piso = Number(q.get('piso'));
   return {
-    vista: q.get('vista') === 'piso' ? 'piso' : 'exterior',
+    vista: VISTAS.find((v) => v === q.get('vista')) ?? 'exterior',
     piso: q.has('piso') && Number.isFinite(piso) ? limitarPiso(piso) : PISO_INICIAL,
   };
 }

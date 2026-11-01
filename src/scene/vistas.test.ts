@@ -10,7 +10,20 @@ import {
   Y_TECHO,
   yPiso,
 } from './medidas.ts';
-import { limitesExterior, poseDe, poseDePrueba, poseExterior, poseFila, posePiso, type Pose, type Vec3 } from './vistas.ts';
+import {
+  ALTURA_DE_CORTE,
+  alturaDeCorte,
+  limitesExterior,
+  poseCompleto,
+  poseDe,
+  poseDePrueba,
+  poseExterior,
+  poseFila,
+  posePiso,
+  posePlanta,
+  type Pose,
+  type Vec3,
+} from './vistas.ts';
 
 const ASPECTOS = [0.7, 1, 1.39, 1.6, 2.4];
 
@@ -210,5 +223,68 @@ describe('cámara de prueba (solo desarrollo)', () => {
     expect(poseDePrueba('?camara=a,b,c,d,e,f')).toBeNull();
     expect(poseDePrueba('?camara=1,2,3,4,5,6,500')).toBeNull();
     expect(poseDePrueba('?camara=1,2,3,4,5,6,40,9')).toBeNull();
+  });
+});
+
+describe('edificio completo', () => {
+  it('se ve de frente y sin giro, con todo el edificio de P10 al sótano en cualquier forma de lienzo', () => {
+    for (const aspecto of ASPECTOS) {
+      const pose = poseCompleto(aspecto);
+      expect(pose.posicion[0]).toBeCloseTo(pose.objetivo[0], 6);
+      expect(pose.posicion[2]).toBeGreaterThan(pose.objetivo[2]);
+      for (const x of [BLOQUE.x0, TORRE.x1]) {
+        for (const y of [Y_FONDO, Y_TECHO]) {
+          for (const z of [BLOQUE.z0, BLOQUE.z1]) {
+            const p = proyectar(pose, aspecto, [x, y, z]);
+            expect(p.delante).toBe(true);
+            expect(Math.abs(p.x), `aspecto ${aspecto}`).toBeLessThanOrEqual(1);
+            expect(Math.abs(p.y), `aspecto ${aspecto}`).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    }
+  });
+
+  it('poseDe la elige', () => {
+    expect(poseDe('completo', 4, 1.4)).toEqual(poseCompleto(1.4));
+  });
+});
+
+describe('planta', () => {
+  it('la cámara está justo arriba del centro del pasillo y el pozo, mirando hacia abajo, con el frente hacia abajo de la pantalla', () => {
+    for (const piso of [1, 5, 9]) {
+      const pose = posePlanta(piso, 1.4);
+      expect(pose.posicion[0]).toBeCloseTo(pose.objetivo[0], 6);
+      expect(pose.posicion[2]).toBeCloseTo(pose.objetivo[2], 2);
+      expect(pose.posicion[1]).toBeGreaterThan(yPiso(piso) + 10);
+      expect(pose.objetivo[1]).toBe(yPiso(piso));
+      expect(pose.arriba).toEqual([0, 0, -1]);
+    }
+  });
+
+  it('cabe todo lo que tiene el piso (pasillo, vestíbulo y pozo) en cualquier forma de lienzo', () => {
+    for (const aspecto of ASPECTOS) {
+      const pose = posePlanta(3, aspecto);
+      const altura = pose.posicion[1] - pose.objetivo[1];
+      const mitadAlto = altura * Math.tan((pose.fov * Math.PI) / 360);
+      const mitadAncho = mitadAlto * aspecto;
+      for (const x of [PASILLO.x0, TORRE.x1]) {
+        expect(Math.abs(x - pose.objetivo[0]), `aspecto ${aspecto}`).toBeLessThanOrEqual(mitadAncho);
+      }
+      for (const z of [TORRE.z0, TORRE.z1]) {
+        expect(Math.abs(z - pose.objetivo[2]), `aspecto ${aspecto}`).toBeLessThanOrEqual(mitadAlto);
+      }
+    }
+  });
+
+  it('el corte queda sobre las cabezas (1,2) y bajo el techo de la cabina (1,9), a la altura del piso elegido', () => {
+    expect(ALTURA_DE_CORTE).toBeGreaterThan(1.2);
+    expect(ALTURA_DE_CORTE).toBeLessThan(1.9);
+    expect(alturaDeCorte(1)).toBeCloseTo(ALTURA_DE_CORTE, 9);
+    expect(alturaDeCorte(4)).toBeCloseTo(yPiso(4) + ALTURA_DE_CORTE, 9);
+  });
+
+  it('poseDe la elige', () => {
+    expect(poseDe('planta', 6, 1.4)).toEqual(posePlanta(6, 1.4));
   });
 });

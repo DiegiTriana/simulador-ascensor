@@ -42,7 +42,7 @@ export function Torre({ manejadores }: { manejadores: Manejadores }) {
     };
   }, [manejadores, material]);
   useTexturasIndicador(manejadores);
-  const exterior = useEscena((e) => e.vista === 'exterior');
+  const exterior = useEscena((e) => e.vista === 'exterior' || e.vista === 'completo');
   return (
     <group>
       <VidrioDeLaTorre />
@@ -59,6 +59,7 @@ export function Torre({ manejadores }: { manejadores: Manejadores }) {
       <Caja posicion={[CABINA.xCentro, Y_FONDO - 0.15, TORRE.zc]} tam={[4.1, 0.3, TORRE.ancho]} color={PALETA.pizarra} radio={0.05} />
       <Cabina manejadores={manejadores} />
       <RotuloSinAcceso />
+      <SotanoConPocaLuz />
     </group>
   );
 }
@@ -239,17 +240,34 @@ function RotuloPiso({ piso }: { piso: number }) {
   );
 }
 
-/** El letrero de P10: el ascensor no llega a ese piso. */
+/**
+ * El letrero de P10: el ascensor no llega a ese piso. Va delante del marco del vidrio (que sobresale 0,1 del plano del
+ * frente), no dentro de él, para que ninguna barra lo tape.
+ */
 function RotuloSinAcceso() {
   const textura = useRotulo('P10, sin acceso', { fondo: PALETA.rojo, tinta: PALETA.blanco, ancho: 640, alto: 112 });
   if (!textura) return null;
   return (
-    <group position={[4, yPiso(PISO_SIN_ACCESO) + 1.35, TORRE.z1 + 0.04]}>
+    <group position={[4, yPiso(PISO_SIN_ACCESO) + 1.35, TORRE.z1 + GROSOR_MARCO / 2 + 0.06]}>
       <mesh>
         <planeGeometry args={[5.2, 0.91]} />
         <meshBasicMaterial map={textura} toneMapped={false} transparent />
       </mesh>
     </group>
+  );
+}
+
+/**
+ * El sótano tiene poca luz: un velo oscuro y transparente sobre el pozo y el vestíbulo de S oscurece lo que haya
+ * dentro (la cabina cuando baja, el personal de aseo) sin tocar la luz de los demás pisos.
+ */
+function SotanoConPocaLuz() {
+  const alto = yPiso(PISO_SOTANO + 1) - Y_FONDO - 0.02;
+  return (
+    <mesh position={[(TORRE.x0 + TORRE.x1) / 2, Y_FONDO + alto / 2, TORRE.zc]} renderOrder={5}>
+      <boxGeometry args={[TORRE.x1 - TORRE.x0 - 0.1, alto, TORRE.z1 - TORRE.z0 + 0.04]} />
+      <meshBasicMaterial color="#0d1020" transparent opacity={0.42} depthWrite={false} toneMapped={false} />
+    </mesh>
   );
 }
 

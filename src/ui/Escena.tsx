@@ -3,7 +3,9 @@ import { lazy, Suspense, useState } from 'react';
 import { LimiteDeErrores, webglDisponible } from '../scene/Limite.tsx';
 import { PISO_MAXIMO } from '../scene/medidas.ts';
 import { useAnimacion } from '../store/animacion.ts';
+import { useCalidad } from '../store/calidad.ts';
 import { useEscena } from '../store/escena.ts';
+import { VISTAS_CON_PISO, type Vista } from '../scene/vistas.ts';
 import { useApp } from '../store/app.ts';
 import { AvisoFinDeFranja, IndicadoresEnVivo, Reproductor } from './CorridaEnVivo.tsx';
 import { irAResultados } from './foco.ts';
@@ -19,10 +21,8 @@ export function Escena() {
   const hayResultado = useApp((s) => s.resultado !== null);
   const [sinContexto, setSinContexto] = useState(false);
   const mostrar3D = webglDisponible() && !sinContexto;
-  const descripcion =
-    vista === 'exterior'
-      ? 'Vista exterior: el edificio de ladrillo con la torre de vidrio donde está el único ascensor.'
-      : `Vista desde el piso P${piso}: el pasillo frente a la puerta del ascensor.`;
+  const descripcion = descripcionDe(vista, piso);
+  const nivelDeCalidad = useCalidad((s) => s.nivel);
 
   return (
     <section className="escena" aria-label="Escena del ascensor">
@@ -47,12 +47,32 @@ export function Escena() {
           </button>
         )}
         {mostrar3D && !corrida && <span className="escena-etiqueta">Escena de muestra. Pulsa Simular para ver una corrida.</span>}
+        {mostrar3D && nivelDeCalidad > 0 && (
+          <span className="escena-calidad" role="status">
+            Calidad reducida para que la escena vaya fluida.
+          </span>
+        )}
       </div>
       {mostrar3D && corrida && <Reproductor corrida={corrida} />}
       {mostrar3D && <BarraDeEscena />}
     </section>
   );
 }
+
+const DESCRIPCIONES: Record<Vista, (piso: number) => string> = {
+  exterior: () => 'Vista exterior: el edificio de ladrillo con la torre de vidrio donde está el único ascensor.',
+  piso: (piso) => `Vista desde el piso P${piso}: el pasillo frente a la puerta del ascensor.`,
+  completo: () => 'Edificio completo, de frente: la torre de vidrio de sótano a P10 con la cabina y la gente que espera en cada piso.',
+  planta: (piso) => `Planta del piso P${piso}, vista desde arriba: el pasillo, el vestíbulo y el pozo del ascensor.`,
+};
+const descripcionDe = (vista: Vista, piso: number) => DESCRIPCIONES[vista](piso);
+
+const VISTAS: { vista: Vista; nombre: string }[] = [
+  { vista: 'exterior', nombre: 'Exterior' },
+  { vista: 'piso', nombre: 'Desde un piso' },
+  { vista: 'completo', nombre: 'Edificio completo' },
+  { vista: 'planta', nombre: 'Planta' },
+];
 
 function AvisoSinEscena({ detalle }: { detalle?: string }) {
   return (
@@ -78,12 +98,11 @@ function BarraDeEscena() {
   return (
     <div className="escena-barra">
       <div className="segmentos" role="group" aria-label="Vista de la escena">
-        <button type="button" aria-pressed={vista === 'exterior'} onClick={() => fijarVista('exterior')}>
-          Exterior
-        </button>
-        <button type="button" aria-pressed={vista === 'piso'} onClick={() => fijarVista('piso')}>
-          Desde un piso
-        </button>
+        {VISTAS.map((v) => (
+          <button key={v.vista} type="button" aria-pressed={vista === v.vista} onClick={() => fijarVista(v.vista)}>
+            {v.nombre}
+          </button>
+        ))}
       </div>
 
       {vista === 'exterior' ? (
@@ -95,7 +114,7 @@ function BarraDeEscena() {
             Ver la fila
           </button>
         </div>
-      ) : (
+      ) : VISTAS_CON_PISO.includes(vista) ? (
         <div className="selector-piso" role="group" aria-label="Piso">
           <div className="pisos-lista">
             {PISOS.map((p) => (
@@ -114,7 +133,7 @@ function BarraDeEscena() {
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

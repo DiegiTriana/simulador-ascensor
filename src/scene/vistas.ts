@@ -1,5 +1,5 @@
-// Poses de cámara de las dos vistas de esta parte: exterior y desde un piso. Son funciones puras del tamaño
-// del lienzo y del piso, para que se puedan probar sin dibujar nada.
+// Poses de cámara de las cuatro vistas: exterior, desde un piso, edificio completo y planta. Son funciones puras
+// del tamaño del lienzo y del piso, para que se puedan probar sin dibujar nada.
 
 import {
   BLOQUE,
@@ -13,7 +13,10 @@ import {
   yPiso,
 } from './medidas.ts';
 
-export type Vista = 'exterior' | 'piso';
+export type Vista = 'exterior' | 'piso' | 'completo' | 'planta';
+
+/** Vistas en las que se elige un piso (P1 a P9). */
+export const VISTAS_CON_PISO: readonly Vista[] = ['piso', 'planta'];
 export type Vec3 = [number, number, number];
 
 export interface Pose {
@@ -21,6 +24,8 @@ export interface Pose {
   objetivo: Vec3;
   /** Campo de visión vertical, en grados. */
   fov: number;
+  /** Hacia dónde queda «arriba» en la pantalla (por defecto +y). La planta mira hacia abajo y necesita otro. */
+  arriba?: Vec3;
 }
 
 const rad = (grados: number) => (grados * Math.PI) / 180;
@@ -124,8 +129,53 @@ export function poseDePrueba(busqueda: string): Pose | null {
   return { posicion: [n[0], n[1], n[2]], objetivo: [n[3], n[4], n[5]], fov };
 }
 
+/** Edificio completo: de frente y sin giro, con campo de visión angosto, para leer los pisos a su altura. */
+const COMPLETO = { elevacion: 3, fov: 20, margen: 1.4 };
+
+/** El edificio de P10 al sótano, con su bloque y su torre, visto de frente (la cabina y las filas de cada piso). */
+export function poseCompleto(aspecto: number): Pose {
+  const mitadAlto = (Y_TECHO - Y_FONDO) / 2 + COMPLETO.margen;
+  const mitadAncho = (TORRE.x1 - BLOQUE.x0) / 2 + COMPLETO.margen;
+  const t = Math.tan(rad(COMPLETO.fov / 2));
+  const d = Math.max(mitadAlto / t, mitadAncho / (t * Math.max(aspecto, 0.3)));
+  const el = rad(COMPLETO.elevacion);
+  const objetivo: Vec3 = [(BLOQUE.x0 + TORRE.x1) / 2, (Y_TECHO + Y_FONDO) / 2, TORRE.z1];
+  return {
+    posicion: [objetivo[0], objetivo[1] + d * Math.sin(el), objetivo[2] + d * Math.cos(el)],
+    objetivo,
+    fov: COMPLETO.fov,
+  };
+}
+
+/** Planta: se corta el piso a esta altura sobre su suelo: sobre las cabezas (1,2) y bajo el techo de la cabina (1,9). */
+export const ALTURA_DE_CORTE = 1.7;
+/** Lo que debe verse en la planta: el pasillo, el vestíbulo y el pozo, con su margen. */
+const PLANTA = { fov: 28, margen: 1.2 };
+
+/** Altura (y) del plano que corta la planta de un piso: lo que queda más arriba no se dibuja. */
+export const alturaDeCorte = (piso: number): number => yPiso(piso) + ALTURA_DE_CORTE;
+
+/**
+ * Planta de un piso: la cámara mira hacia abajo desde arriba del pasillo, el vestíbulo y el pozo, con el frente del
+ * edificio hacia abajo de la pantalla. Se cortan el techo y todo lo que está más arriba.
+ */
+export function posePlanta(piso: number, aspecto: number): Pose {
+  const suelo = yPiso(piso);
+  const x0 = PASILLO.x0;
+  const x1 = TORRE.x1;
+  const mitadAncho = (x1 - x0) / 2 + PLANTA.margen;
+  const mitadAlto = (TORRE.z1 - TORRE.z0) / 2 + PLANTA.margen;
+  const t = Math.tan(rad(PLANTA.fov / 2));
+  const d = Math.max(mitadAlto / t, mitadAncho / (t * Math.max(aspecto, 0.3)));
+  const centro: Vec3 = [(x0 + x1) / 2, suelo, TORRE.zc];
+  // Un poco corrida hacia el frente para que la orientación de la pantalla no quede indefinida.
+  return { posicion: [centro[0], suelo + d, centro[2] + 0.001], objetivo: centro, fov: PLANTA.fov, arriba: [0, 0, -1] };
+}
+
 export function poseDe(vista: Vista, piso: number, aspecto: number, encuadre: Encuadre = 'todo'): Pose {
   if (vista === 'piso') return posePiso(piso, aspecto);
+  if (vista === 'completo') return poseCompleto(aspecto);
+  if (vista === 'planta') return posePlanta(piso, aspecto);
   return encuadre === 'fila' ? poseFila(aspecto) : poseExterior(aspecto);
 }
 
