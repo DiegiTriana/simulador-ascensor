@@ -1,5 +1,5 @@
 /** Lo que acompaña a la escena cuando hay una corrida: los cinco indicadores y los controles de reproducción. */
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 import { indicadoresEn, formatoReloj, type Indicadores } from '../scene/corrida.ts';
 import { etiquetaPiso } from '../scene/medidas.ts';
 import { CAPACIDAD_CABINA } from '../data/modelos.ts';
@@ -30,15 +30,19 @@ function FlechaDePiso({ sentido }: { sentido: Indicadores['sentido'] }) {
 }
 
 /** Reloj del día, piso de la cabina, ocupación, fila de P1 y quienes se han ido por las escaleras. */
-export function IndicadoresEnVivo({ corrida }: { corrida: Corrida }) {
+/** `accion` es el botón «Ver resultados» (solo en celular): va junto a la nota, arriba, nunca sobre la escena. */
+export function IndicadoresEnVivo({ corrida, accion }: { corrida: Corrida; accion?: ReactNode }) {
   const t = useSegundo(corrida);
   const i = useMemo(() => indicadoresEn(corrida.indice, t), [corrida, t]);
   const sentido = i.sentido === 0 ? 'parada' : i.sentido > 0 ? 'subiendo' : 'bajando';
   return (
     <section className="vivo" aria-label="Lo que pasa en la corrida">
-      <p className="vivo-nota">
-        Lo que ves es una de las 10 corridas<span className="vivo-nota-resto">; la tabla muestra el promedio de las 10.</span>
-      </p>
+      <div className="vivo-cabecera">
+        <p className="vivo-nota">
+          Lo que ves es una de las 10 corridas<span className="vivo-nota-resto">; la tabla muestra el promedio de las 10.</span>
+        </p>
+        {accion}
+      </div>
       <dl className="vivo-datos">
         <div className="vivo-dato vivo-hora">
           <dt>Hora</dt>

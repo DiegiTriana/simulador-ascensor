@@ -25,8 +25,22 @@ export function Escena() {
   const nivelDeCalidad = useCalidad((s) => s.nivel);
 
   return (
-    <section className="escena" aria-label="Escena del ascensor">
-      {mostrar3D && corrida && <IndicadoresEnVivo corrida={corrida} />}
+    <section className="escena" aria-label="Escena del ascensor" data-vista={vista}>
+      {mostrar3D && corrida && (
+        <IndicadoresEnVivo
+          corrida={corrida}
+          accion={
+            hayResultado && (
+              <button type="button" id="ver-resultados" className="ver-resultados" onClick={irAResultados}>
+                Ver resultados
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                  <path d="M12 19 L4.5 8 H19.5 Z" fill="currentColor" />
+                </svg>
+              </button>
+            )
+          }
+        />
+      )}
       <div className="escena-lienzo" role={mostrar3D ? 'img' : undefined} aria-label={mostrar3D ? descripcion : undefined}>
         {mostrar3D ? (
           <LimiteDeErrores respaldo={(mensaje) => <AvisoSinEscena detalle={mensaje} />}>
@@ -38,14 +52,6 @@ export function Escena() {
           <AvisoSinEscena />
         )}
         {mostrar3D && corrida && <AvisoFinDeFranja corrida={corrida} />}
-        {mostrar3D && hayResultado && (
-          <button type="button" id="ver-resultados" className="ver-resultados" onClick={irAResultados}>
-            Ver resultados
-            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path d="M12 19 L4.5 8 H19.5 Z" fill="currentColor" />
-            </svg>
-          </button>
-        )}
         {mostrar3D && !corrida && <span className="escena-etiqueta">Escena de muestra. Pulsa Simular para ver una corrida.</span>}
         {mostrar3D && nivelDeCalidad > 0 && (
           <span className="escena-calidad" role="status">

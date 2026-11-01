@@ -353,8 +353,15 @@ sub {
   background: var(--tarjeta);
   border-bottom: 1px solid var(--linea);
 }
-.vivo-nota {
+.vivo-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
+}
+.vivo-nota {
+  margin: 0;
   color: var(--tinta-2);
   font-size: 0.85rem;
   line-height: 1.3;
@@ -557,10 +564,7 @@ sub {
   line-height: 1.35;
 }
 .ver-resultados {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1;
+  flex: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -595,6 +599,17 @@ sub {
     align-items: center;
     gap: 6px;
     font-size: 0.9rem;
+  }
+}
+
+/* La planta es una franja larga: en celular el lienzo se hace más alto y la cámara la gira para que lo llene. */
+@media (max-width: 899px) {
+  .escena[data-vista='planta'] {
+    height: auto;
+  }
+  .escena[data-vista='planta'] .escena-lienzo {
+    flex: none;
+    height: clamp(380px, 56dvh, 600px);
   }
 }
 

@@ -157,7 +157,9 @@ export const alturaDeCorte = (piso: number): number => yPiso(piso) + ALTURA_DE_C
 
 /**
  * Planta de un piso: la cámara mira hacia abajo desde arriba del pasillo, el vestíbulo y el pozo, con el frente del
- * edificio hacia abajo de la pantalla. Se cortan el techo y todo lo que está más arriba.
+ * edificio hacia abajo de la pantalla. Se cortan el techo y todo lo que está más arriba. La planta es una franja larga
+ * (16 por 4,6 m): en un lienzo vertical (más alto que ancho) se gira 90° para que ocupe el alto, con el pozo arriba, el
+ * pasillo abajo y el frente a la derecha. En uno horizontal no cambia.
  */
 export function posePlanta(piso: number, aspecto: number): Pose {
   const suelo = yPiso(piso);
@@ -166,10 +168,18 @@ export function posePlanta(piso: number, aspecto: number): Pose {
   const mitadAncho = (x1 - x0) / 2 + PLANTA.margen;
   const mitadAlto = (TORRE.z1 - TORRE.z0) / 2 + PLANTA.margen;
   const t = Math.tan(rad(PLANTA.fov / 2));
-  const d = Math.max(mitadAlto / t, mitadAncho / (t * Math.max(aspecto, 0.3)));
+  const a = Math.max(aspecto, 0.3);
+  const vertical = a < 1;
+  // Girada, el alto de la pantalla cubre el largo de la planta (x) y el ancho, su fondo (z).
+  const d = vertical ? Math.max(mitadAncho / t, mitadAlto / (t * a)) : Math.max(mitadAlto / t, mitadAncho / (t * a));
   const centro: Vec3 = [(x0 + x1) / 2, suelo, TORRE.zc];
   // Un poco corrida hacia el frente para que la orientación de la pantalla no quede indefinida.
-  return { posicion: [centro[0], suelo + d, centro[2] + 0.001], objetivo: centro, fov: PLANTA.fov, arriba: [0, 0, -1] };
+  return {
+    posicion: [centro[0], suelo + d, centro[2] + 0.001],
+    objetivo: centro,
+    fov: PLANTA.fov,
+    arriba: vertical ? [1, 0, 0] : [0, 0, -1],
+  };
 }
 
 export function poseDe(vista: Vista, piso: number, aspecto: number, encuadre: Encuadre = 'todo'): Pose {

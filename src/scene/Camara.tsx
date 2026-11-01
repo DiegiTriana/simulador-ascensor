@@ -88,8 +88,10 @@ export function Camara({ vista, piso, encuadre, orden, sinMovimiento }: Props) {
     }
     // Otro piso, o el lienzo cambió de forma: recolocar, sin deslizar. En la exterior solo si nadie movió la cámara.
     if (VISTAS_CON_PISO.includes(vista) || vista === 'completo' || !tocada.current) {
-      deslizando.current = null;
-      colocar(destino);
+      // Si el lienzo cambió de forma justo cuando la cámara se deslizaba (la planta pide un lienzo más alto), la
+      // deslizada sigue hacia la pose nueva en vez de saltar.
+      if (deslizando.current) deslizando.current.hacia = destino;
+      else colocar(destino);
     }
     // `colocar` solo usa refs y objetos de three, que no cambian.
   }, [vista, piso, encuadre, orden, aspecto, sinMovimiento]);

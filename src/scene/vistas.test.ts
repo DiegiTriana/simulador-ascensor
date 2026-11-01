@@ -268,11 +268,13 @@ describe('planta', () => {
       const altura = pose.posicion[1] - pose.objetivo[1];
       const mitadAlto = altura * Math.tan((pose.fov * Math.PI) / 360);
       const mitadAncho = mitadAlto * aspecto;
+      // Girada (lienzo vertical), el alto de la pantalla cubre x y el ancho cubre z.
+      const [sobreX, sobreZ] = aspecto < 1 ? [mitadAlto, mitadAncho] : [mitadAncho, mitadAlto];
       for (const x of [PASILLO.x0, TORRE.x1]) {
-        expect(Math.abs(x - pose.objetivo[0]), `aspecto ${aspecto}`).toBeLessThanOrEqual(mitadAncho);
+        expect(Math.abs(x - pose.objetivo[0]), `aspecto ${aspecto}`).toBeLessThanOrEqual(sobreX);
       }
       for (const z of [TORRE.z0, TORRE.z1]) {
-        expect(Math.abs(z - pose.objetivo[2]), `aspecto ${aspecto}`).toBeLessThanOrEqual(mitadAlto);
+        expect(Math.abs(z - pose.objetivo[2]), `aspecto ${aspecto}`).toBeLessThanOrEqual(sobreZ);
       }
     }
   });
@@ -282,6 +284,20 @@ describe('planta', () => {
     expect(ALTURA_DE_CORTE).toBeLessThan(1.9);
     expect(alturaDeCorte(1)).toBeCloseTo(ALTURA_DE_CORTE, 9);
     expect(alturaDeCorte(4)).toBeCloseTo(yPiso(4) + ALTURA_DE_CORTE, 9);
+  });
+
+  it('en un lienzo vertical se gira 90° y ocupa el alto; en uno horizontal no cambia', () => {
+    for (const aspecto of [0.4, 0.7, 0.99]) expect(posePlanta(2, aspecto).arriba).toEqual([1, 0, 0]);
+    for (const aspecto of [1, 1.39, 2.4]) expect(posePlanta(2, aspecto).arriba).toEqual([0, 0, -1]);
+    // Girada llena casi todo el alto: el largo de la planta ocupa más de la mitad de la pantalla.
+    for (const aspecto of [0.5, 0.7]) {
+      const pose = posePlanta(2, aspecto);
+      const mitadAlto = (pose.posicion[1] - pose.objetivo[1]) * Math.tan((pose.fov * Math.PI) / 360);
+      expect((TORRE.x1 - PASILLO.x0) / 2 / mitadAlto).toBeGreaterThan(0.7);
+    }
+    // Y se ve más grande que sin girar: la misma planta en un lienzo vertical.
+    const girada = posePlanta(2, 0.6).posicion[1];
+    expect(girada).toBeLessThan(2.6 + (TORRE.x1 - PASILLO.x0 + 2.4) / 2 / (Math.tan((28 * Math.PI) / 360) * 0.6));
   });
 
   it('poseDe la elige', () => {
