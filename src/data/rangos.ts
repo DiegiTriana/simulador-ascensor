@@ -18,6 +18,16 @@ export const RANGOS = {
   usosAseo: { min: 0, max: 50 },
 } as const;
 
+/** Cifras que se dejan escribir en cada campo numérico (las del máximo de su rango). */
+export const CIFRAS = {
+  duracion: 3,
+  llegadasP1: 4,
+  bajan: 4,
+  sillas: 2,
+  muletas: 2,
+  usosAseo: 2,
+} as const;
+
 /**
  * μ medida en la simulación (personas por minuto que suben en las vueltas saturadas, fase 1:
  * 3,53 en el caso del miércoles). Solo se usa para el aviso de saturación.

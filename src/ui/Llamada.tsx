@@ -1,15 +1,15 @@
 import { useRef } from 'react';
 import { useApp } from '../store/app.ts';
 import { textoEstado } from './estado.ts';
-import { idCampo, useValidacion } from './validacionUi.ts';
+import { idCampo, useUltimaValida, useValidacion } from './validacionUi.ts';
 
 /** Aviso de saturación: no bloquea nada, solo cuenta lo que va a pasar. */
 export function Aviso() {
-  const v = useValidacion();
-  const aviso = v.ok ? v.avisos[0] : undefined;
+  const { ultima, vigente } = useUltimaValida();
+  const aviso = ultima?.avisos[0];
   if (!aviso) return null;
   return (
-    <p className="aviso">
+    <p className="aviso" style={vigente ? undefined : { visibility: 'hidden' }}>
       <span className="aviso-icono" aria-hidden="true">
         !
       </span>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { leerEntero, leerHora, validar, type EntradasTexto } from './validacion.ts';
+import { excedeElMaximo, leerEntero, leerHora, validar, type Campo, type EntradasTexto } from './validacion.ts';
 import { CASO_MIERCOLES } from '../data/casos.ts';
+import { CIFRAS, RANGOS } from '../data/rangos.ts';
 
 const MIERCOLES: EntradasTexto = {
   horaInicio: '12:40', duracion: '50', llegadasP1: '119', bajan: '19', sillas: '0', muletas: '0', usosAseo: '1',
@@ -110,5 +111,56 @@ describe('validar', () => {
       const r = validar(con({ horaInicio: '08:00', duracion: '300', llegadasP1: '3000' }));
       expect(r.ok && r.avisos).toHaveLength(1);
     });
+  });
+});
+
+describe('cifras permitidas en cada campo', () => {
+  const rango = (campo: keyof typeof CIFRAS) => RANGOS[campo === 'duracion' ? 'duracionMin' : campo];
+
+  it('son las cifras del máximo de su rango: 4 llegadas y bajan, 3 duración, 2 sillas, muletas y aseo', () => {
+    expect(CIFRAS).toEqual({ duracion: 3, llegadasP1: 4, bajan: 4, sillas: 2, muletas: 2, usosAseo: 2 });
+    for (const campo of Object.keys(CIFRAS) as (keyof typeof CIFRAS)[]) {
+      expect(String(rango(campo).max)).toHaveLength(CIFRAS[campo]);
+    }
+  });
+
+  it('con todas las cifras llenas (9…9) el número pasa el máximo y se avisa en el acto', () => {
+    for (const campo of Object.keys(CIFRAS) as (keyof typeof CIFRAS)[]) {
+      const lleno = '9'.repeat(CIFRAS[campo]);
+      const e = errores({ horaInicio: '06:00', [campo]: lleno });
+      expect(excedeElMaximo(campo, lleno, e[campo]), campo).toBe(true);
+      expect(e[campo]).toContain(`entre ${rango(campo).min} y ${rango(campo).max}`);
+    }
+  });
+});
+
+describe('excedeElMaximo: solo el número que pasa el máximo se avisa mientras se escribe', () => {
+  const aviso = (campo: Campo, texto: string, c: Partial<EntradasTexto> = {}) =>
+    excedeElMaximo(campo, texto, errores({ [campo]: texto, ...c })[campo]);
+
+  it('avisa si pasa el máximo (el máximo mismo es válido)', () => {
+    expect(aviso('llegadasP1', '3001')).toBe(true);
+    expect(aviso('bajan', '1001')).toBe(true);
+    expect(aviso('sillas', '21')).toBe(true);
+    expect(aviso('muletas', '51')).toBe(true);
+    expect(aviso('usosAseo', '99')).toBe(true);
+    expect(aviso('duracion', '961', { horaInicio: '06:00' })).toBe(true);
+    expect(validar(con({ llegadasP1: '3000' })).ok).toBe(true);
+  });
+
+  it('avisa si pasa lo que cabe antes de las 22:05 con esa hora de inicio', () => {
+    expect(aviso('duracion', '566')).toBe(true); // 12:40 + 566 min pasa de las 22:05
+    expect(errores({ duracion: '566' }).duracion).toContain('duración máxima es 565');
+  });
+
+  it('no avisa todavía de campos vacíos, letras, decimales, negativos ni números chicos', () => {
+    for (const texto of ['', 'abc', '5,5', '5.5', '-3', '1a']) expect(aviso('llegadasP1', texto), texto).toBe(false);
+    expect(aviso('duracion', '0')).toBe(false);
+  });
+
+  it('no avisa de las sillas contra las llegadas (eso espera a Simular) ni de la hora', () => {
+    expect(aviso('sillas', '15', { llegadasP1: '10' })).toBe(false);
+    expect(excedeElMaximo('horaInicio', '25', 'x')).toBe(false);
+    expect(excedeElMaximo('sillas', '99', undefined)).toBe(false);
   });
 });

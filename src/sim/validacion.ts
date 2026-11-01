@@ -48,6 +48,15 @@ export function leerEntero(texto: string, min: number, max: number): { valor: nu
   return { valor };
 }
 
+/**
+ * ¿El error de este campo es porque el número escrito pasa el máximo? Solo así se muestra el mensaje apenas se
+ * escribe; los demás (vacío, letras, decimales, sillas contra llegadas) esperan a que se pulse Simular.
+ */
+export function excedeElMaximo(campo: Campo, texto: string, error: string | undefined): boolean {
+  if (!error || campo === 'horaInicio' || !/^\d+$/.test(texto.trim())) return false;
+  return /demasiado grande|duración máxima/.test(error);
+}
+
 export function validar(texto: EntradasTexto): ResultadoValidacion {
   const errores: Errores = {};
   const num: Partial<Record<Campo, number>> = {};

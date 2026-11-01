@@ -1,18 +1,18 @@
 import { useId, type ReactNode } from 'react';
 import { CAMBIOS_DE_CLASE, formatoHora } from '../data/horario.ts';
-import { INICIO_MAX_MIN, INICIO_MIN_MIN, RANGOS } from '../data/rangos.ts';
+import { CIFRAS, INICIO_MAX_MIN, INICIO_MIN_MIN, RANGOS } from '../data/rangos.ts';
 import { tasaEsperadaPicos } from '../sim/llegadas.ts';
 import type { Campo } from '../sim/validacion.ts';
 import { useApp, type SeccionAyuda, type SeleccionHora } from '../store/app.ts';
 import { Icono, type NombreIcono } from './Iconos.tsx';
 import { Aviso, Llamada } from './Llamada.tsx';
 import { coma } from './formato.ts';
-import { idCampo, useErrorVisible, useValidacion } from './validacionUi.ts';
+import { idCampo, useErrorVisible, useExcesoVisible, useUltimaValida } from './validacionUi.ts';
 
-function Mensaje({ id, texto }: { id: string; texto: string | undefined }) {
+function Mensaje({ id, texto, flotante = false }: { id: string; texto: string | undefined; flotante?: boolean }) {
   if (!texto) return null;
   return (
-    <p id={id} className="mensaje-error">
+    <p id={id} className={flotante ? 'mensaje-error mensaje-flotante' : 'mensaje-error'} role={flotante ? 'alert' : undefined}>
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
         <path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
         <path d="M8 6v4M8 11.6v.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -55,6 +55,8 @@ interface CampoUiProps {
   /** Id del control (el `for` de la etiqueta). */
   para: string;
   error: string | undefined;
+  /** Número que pasa el máximo: sale apenas se escribe, flotando, para que nada se corra de lugar. */
+  exceso?: string | undefined;
   /** Los íconos de silla de ruedas y muletas van más grandes para que se reconozcan. */
   iconoGrande?: boolean;
   children: ReactNode;
@@ -62,7 +64,7 @@ interface CampoUiProps {
 }
 
 /** Un dato: ícono, nombre, una línea de ayuda con ejemplo y el control. */
-function CampoUi({ icono, etiqueta, ayuda, para, error, iconoGrande, children, extra }: CampoUiProps) {
+function CampoUi({ icono, etiqueta, ayuda, para, error, exceso, iconoGrande, children, extra }: CampoUiProps) {
   return (
     <div className="campo">
       <Icono nombre={icono} grande={iconoGrande} />
@@ -75,6 +77,7 @@ function CampoUi({ icono, etiqueta, ayuda, para, error, iconoGrande, children, e
       <div className="campo-control">{children}</div>
       {extra}
       <Mensaje id={`${para}-error`} texto={error} />
+      <Mensaje id={`${para}-error`} texto={error ? undefined : exceso} flotante />
     </div>
   );
 }
@@ -94,6 +97,7 @@ function FilaConteo({ campo, etiqueta, ayuda, icono, iconoGrande }: FilaConteoPr
   const valor = useApp((s) => s.texto[campo]);
   const poner = useApp((s) => s.poner);
   const error = useErrorVisible(campo);
+  const exceso = useExcesoVisible(campo);
   const { min, max } = RANGOS[campo];
   const id = idCampo(campo);
 
@@ -103,7 +107,7 @@ function FilaConteo({ campo, etiqueta, ayuda, icono, iconoGrande }: FilaConteoPr
   };
 
   return (
-    <CampoUi icono={icono} iconoGrande={iconoGrande} etiqueta={etiqueta} ayuda={ayuda} para={id} error={error}>
+    <CampoUi icono={icono} iconoGrande={iconoGrande} etiqueta={etiqueta} ayuda={ayuda} para={id} error={error} exceso={exceso}>
       <div className="contador">
         <button type="button" className="boton-cuadrado" aria-label={`Restar uno: ${etiqueta}`} onClick={() => mover(-1)}>
           <span aria-hidden="true">−</span>
@@ -114,11 +118,12 @@ function FilaConteo({ campo, etiqueta, ayuda, icono, iconoGrande }: FilaConteoPr
           className="campo-texto campo-numero"
           type="text"
           inputMode="numeric"
+          maxLength={CIFRAS[campo]}
           autoComplete="off"
           spellCheck={false}
           value={valor}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(id, error)}
+          aria-invalid={error || exceso ? true : undefined}
+          aria-describedby={describedBy(id, error ?? exceso)}
           onChange={(e) => poner(campo, e.target.value)}
         />
         <button type="button" className="boton-cuadrado" aria-label={`Sumar uno: ${etiqueta}`} onClick={() => mover(1)}>
@@ -196,9 +201,10 @@ function FilaDuracion() {
   const valor = useApp((s) => s.texto.duracion);
   const poner = useApp((s) => s.poner);
   const error = useErrorVisible('duracion');
+  const exceso = useExcesoVisible('duracion');
   const id = idCampo('duracion');
   return (
-    <CampoUi icono="duracion" etiqueta="Duración" ayuda="Cuántos minutos dura la franja. Ej.: 50." para={id} error={error}>
+    <CampoUi icono="duracion" etiqueta="Duración" ayuda="Cuántos minutos dura la franja. Ej.: 50." para={id} error={error} exceso={exceso}>
       <div className="con-unidad">
         <input
           id={id}
@@ -206,11 +212,12 @@ function FilaDuracion() {
           className="campo-texto campo-numero"
           type="text"
           inputMode="numeric"
+          maxLength={CIFRAS.duracion}
           autoComplete="off"
           spellCheck={false}
           value={valor}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(id, error)}
+          aria-invalid={error || exceso ? true : undefined}
+          aria-describedby={describedBy(id, error ?? exceso)}
           onChange={(e) => poner('duracion', e.target.value)}
         />
         <span className="unidad">min</span>
@@ -221,16 +228,20 @@ function FilaDuracion() {
 
 /** «Llegan unas 2,4 personas por minuto; 3,7 en los picos»: explica el aviso de saturación y qué son los picos. */
 function LecturaPrevia() {
-  const v = useValidacion();
-  if (!v.ok) return null;
-  const e = v.entradas;
+  const { ultima, vigente } = useUltimaValida();
+  if (!ultima) return null;
+  const e = ultima.entradas;
   const franja = e.llegadasP1 / e.duracionMin;
   const picos = tasaEsperadaPicos(e);
   const texto =
     picos === null
       ? `Llegan unas ${coma(franja)} personas por minuto, parejas en toda la franja (no hay cambio de clase).`
       : `Llegan unas ${coma(franja)} personas por minuto; ${coma(picos)} en los picos (los 12,5 minutos antes y después de cada cambio de clase).`;
-  return <p className="lectura-previa">{texto}</p>;
+  return (
+    <p className="lectura-previa" style={vigente ? undefined : { visibility: 'hidden' }}>
+      {texto}
+    </p>
+  );
 }
 
 function Avanzado() {
